@@ -1,0 +1,41 @@
+name: (Optional) Auto-Deploy to cPanel via FTP
+
+# To use this auto-deploy to cPanel:
+# 1. In your GitHub Repository, go to Settings -> Secrets and variables -> Actions
+# 2. Add Repository secrets:
+#    - CPANEL_FTP_SERVER (e.g. ftp.yourdomain.com or your cPanel server IP)
+#    - CPANEL_FTP_USERNAME (your cPanel FTP username)
+#    - CPANEL_FTP_PASSWORD (your cPanel FTP password)
+# 3. Rename this file to `cpanel-ftp-deploy.yml` (remove .example)
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Sync to cPanel public_html via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_SERVER }}
+          username: ${{ secrets.CPANEL_FTP_USERNAME }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ./public_html/
+          dangerous-clean-slate: false
