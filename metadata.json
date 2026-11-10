@@ -1,0 +1,6 @@
+{
+  "name": "KitabGhor E-Book Store & WhatsApp Checkout",
+  "description": "Modern digital bookstore for free e-book downloads and paid e-books with instant WhatsApp ordering and bKash/Nagad payment verification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
