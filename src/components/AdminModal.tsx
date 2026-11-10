@@ -911,6 +911,33 @@ export const AdminModal: React.FC = () => {
               {activeTab === 'cpanel' && (
                 <div className="space-y-6 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                   
+                  {/* 1-Click Complete cPanel Ready ZIP Download */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-linear-to-r from-emerald-600 to-teal-700 text-white space-y-3 shadow-md">
+                    <div className="flex items-center gap-2.5 font-bold text-sm sm:text-base">
+                      <Download className="w-5 h-5 text-emerald-200" />
+                      <span>
+                        {language === 'bn' 
+                          ? 'রেডি-মেড সিপ্যানেল ওয়েবসাইট প্যাকেজ (১-ক্লিকে ডাউনলোড)' 
+                          : '1-Click cPanel Ready Website ZIP'}
+                      </span>
+                    </div>
+                    <p className="text-emerald-50 text-xs leading-relaxed">
+                      {language === 'bn'
+                        ? 'আপনার কোডিং বা গিটহাবের কোনো কিছু জানার প্রয়োজন নেই! আমরা পুরো ওয়েবসাইট বিল্ড করে একটি জিপ ফাইলে তৈরি করে রেখেছি। নিচের বাটনে ক্লিক করে জিপটি ডাউনলোড করে নিন।'
+                        : 'No coding or GitHub knowledge needed! The entire compiled site is packaged into a ready-to-upload ZIP file.'}
+                    </p>
+                    <div className="pt-1 flex flex-wrap items-center gap-3">
+                      <a
+                        href="/kitabghar-cpanel-ready.zip"
+                        download="kitabghar-cpanel-ready.zip"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-800 font-extrabold rounded-xl transition-all text-xs shadow-md hover:bg-emerald-50 active:scale-95"
+                      >
+                        <Download className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? 'kitabghar-cpanel-ready.zip ডাউনলোড করুন' : 'Download cPanel Ready ZIP'}</span>
+                      </a>
+                    </div>
+                  </div>
+
                   <div className="p-4 rounded-xl bg-slate-900 text-white space-y-2 border border-slate-800">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                       <FileCode className="w-4 h-4" />
