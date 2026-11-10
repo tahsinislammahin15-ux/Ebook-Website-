@@ -46,6 +46,17 @@ export interface StoreSettings {
   adminUsername: string; // e.g. "tahsinislam"
   adminPasscode: string;
   seo?: SEOSettings;
+  coupons?: Coupon[];
+}
+
+export interface Coupon {
+  code: string;
+  discountType: 'percentage' | 'fixed'; // percentage (%) or flat BDT
+  discountValue: number; // e.g. 20 for 20% or 50 for 50 BDT
+  minSpend?: number;
+  description?: string;
+  descriptionBn?: string;
+  isActive: boolean;
 }
 
 export interface SEOSettings {
@@ -66,3 +77,43 @@ export interface SEOSettings {
 }
 
 export type SiteLanguage = 'bn' | 'en';
+
+export interface ReadingProgress {
+  bookId: string;
+  bookTitle: string;
+  bookTitleBn?: string;
+  currentPage: number;
+  totalPages: number;
+  percent: number;
+  lastReadAt: number;
+}
+
+export interface ComboBundle {
+  id: string;
+  name: string;
+  nameBn: string;
+  tagline: string;
+  taglineBn: string;
+  bookIds: string[];
+  originalPrice: number;
+  bundlePrice: number;
+  savings: number;
+  badge: string;
+  badgeBn: string;
+}
+
+export interface CustomerReview {
+  id: string;
+  name: string;
+  nameBn: string;
+  role: string;
+  roleBn: string;
+  avatar: string;
+  rating: number;
+  comment: string;
+  commentBn: string;
+  bookTitle: string;
+  bookTitleBn: string;
+  verified: boolean;
+  date: string;
+}

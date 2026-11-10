@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Ebook, StoreSettings, SiteLanguage } from '../types/ebook';
+import { Ebook, StoreSettings, SiteLanguage, Coupon, ReadingProgress } from '../types/ebook';
 import { DEFAULT_EBOOKS, DEFAULT_STORE_SETTINGS } from '../data/defaultProducts';
 import { TRANSLATIONS } from '../data/translations';
 
@@ -35,6 +35,18 @@ interface StoreContextType {
   exportProductsJSON: () => void;
   resetCatalog: () => void;
   generateEbookDownload: (book: Ebook) => void;
+  coupons: Coupon[];
+  activeCoupon: Coupon | null;
+  applyCoupon: (code: string, currentPrice?: number) => { success: boolean; message: string; discountAmount: number };
+  removeCoupon: () => void;
+  addCoupon: (c: Coupon) => void;
+  deleteCoupon: (code: string) => void;
+  toggleCoupon: (code: string) => void;
+  readingProgress: Record<string, ReadingProgress>;
+  updateReadingProgress: (bookId: string, page: number, totalPages: number) => void;
+  lastReadBook: ReadingProgress | null;
+  downloadGiftModalBook: Ebook | null;
+  closeDownloadGiftModal: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -124,6 +136,57 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return [];
   });
+
+  const [coupons, setCoupons] = useState<Coupon[]>(() => {
+    return settings.coupons || DEFAULT_STORE_SETTINGS.coupons || [];
+  });
+  const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
+
+  // Reading progress tracking (per book)
+  const LOCAL_STORAGE_KEY_PROGRESS = 'kitabghor_reading_progress';
+  const [readingProgress, setReadingProgress] = useState<Record<string, ReadingProgress>>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_PROGRESS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return {};
+  });
+
+  const updateReadingProgress = (bookId: string, page: number, totalPages: number) => {
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return;
+    const percent = Math.min(100, Math.round((page / Math.max(1, totalPages)) * 100));
+    setReadingProgress(prev => {
+      const updated: Record<string, ReadingProgress> = {
+        ...prev,
+        [bookId]: {
+          bookId,
+          bookTitle: book.title,
+          bookTitleBn: book.titleBn,
+          currentPage: page,
+          totalPages,
+          percent,
+          lastReadAt: Date.now()
+        }
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY_PROGRESS, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Derive most recently read book
+  const lastReadBook = React.useMemo(() => {
+    const entries = Object.values(readingProgress);
+    if (entries.length === 0) return null;
+    entries.sort((a, b) => b.lastReadAt - a.lastReadAt);
+    return entries[0];
+  }, [readingProgress]);
+
+  // Download Gift Confetti & Bonus Coupon Modal
+  const [downloadGiftModalBook, setDownloadGiftModalBook] = useState<Ebook | null>(null);
+  const closeDownloadGiftModal = () => setDownloadGiftModalBook(null);
 
   const openWishlist = () => setIsWishlistOpen(true);
   const closeWishlist = () => setIsWishlistOpen(false);
@@ -256,6 +319,72 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setEbooks(DEFAULT_EBOOKS);
   };
 
+  const applyCoupon = (code: string, currentPrice = 0) => {
+    const cleanCode = code.trim().toUpperCase();
+    const found = coupons.find(c => c.code.toUpperCase() === cleanCode && c.isActive);
+    if (!found) {
+      return {
+        success: false,
+        message: language === 'bn' ? 'অকার্যকর বা মেয়াদোত্তীর্ণ কুপন কোড' : 'Invalid or expired coupon code',
+        discountAmount: 0
+      };
+    }
+    if (found.minSpend && currentPrice < found.minSpend) {
+      return {
+        success: false,
+        message: language === 'bn' 
+          ? `এই কুপনের জন্য সর্বনিম্ন ৳${found.minSpend} টাকার বই অর্ডার প্রয়োজন` 
+          : `Minimum spend of ৳${found.minSpend} required for this coupon`,
+        discountAmount: 0
+      };
+    }
+
+    let discount = 0;
+    if (found.discountType === 'percentage') {
+      discount = Math.round((currentPrice * found.discountValue) / 100);
+    } else {
+      discount = Math.min(found.discountValue, currentPrice);
+    }
+
+    setActiveCoupon(found);
+    return {
+      success: true,
+      message: language === 'bn' 
+        ? `${found.code} কোড প্রয়োগ হয়েছে! (৳${discount} ছাড়)` 
+        : `Coupon ${found.code} applied! (Saved ৳${discount})`,
+      discountAmount: discount
+    };
+  };
+
+  const removeCoupon = () => {
+    setActiveCoupon(null);
+  };
+
+  const addCoupon = (newCoupon: Coupon) => {
+    setCoupons(prev => {
+      const filtered = prev.filter(c => c.code.toUpperCase() !== newCoupon.code.toUpperCase());
+      const next = [newCoupon, ...filtered];
+      updateSettings({ coupons: next });
+      return next;
+    });
+  };
+
+  const deleteCoupon = (code: string) => {
+    setCoupons(prev => {
+      const next = prev.filter(c => c.code.toUpperCase() !== code.toUpperCase());
+      updateSettings({ coupons: next });
+      return next;
+    });
+  };
+
+  const toggleCoupon = (code: string) => {
+    setCoupons(prev => {
+      const next = prev.map(c => (c.code.toUpperCase() === code.toUpperCase() ? { ...c, isActive: !c.isActive } : c));
+      updateSettings({ coupons: next });
+      return next;
+    });
+  };
+
   // Direct free ebook downloader
   const generateEbookDownload = (book: Ebook) => {
     if (book.downloadUrl && book.downloadUrl !== '#' && book.downloadUrl.trim() !== '') {
@@ -312,6 +441,9 @@ ${language === 'bn'
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Trigger instant celebratory confetti & gift modal
+    setDownloadGiftModalBook(book);
   };
 
   return (
@@ -348,6 +480,18 @@ ${language === 'bn'
         exportProductsJSON,
         resetCatalog,
         generateEbookDownload,
+        coupons,
+        activeCoupon,
+        applyCoupon,
+        removeCoupon,
+        addCoupon,
+        deleteCoupon,
+        toggleCoupon,
+        readingProgress,
+        updateReadingProgress,
+        lastReadBook,
+        downloadGiftModalBook,
+        closeDownloadGiftModal
       }}
     >
       {children}

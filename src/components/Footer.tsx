@@ -30,6 +30,18 @@ export const Footer: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-6 text-xs text-slate-600 dark:text-slate-400">
             <a
+              href="#how-it-works"
+              className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            >
+              {language === 'bn' ? 'কীভাবে কিনবেন' : 'How It Works'}
+            </a>
+            <a
+              href="#faq"
+              className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            >
+              {language === 'bn' ? 'সাধারণ প্রশ্ন ও উত্তর (FAQ)' : 'FAQ'}
+            </a>
+            <a
               href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(
                 language === 'bn' ? 'হ্যালো, বই অর্ডার বিষয়ে কথা বলতে চাই।' : 'Hello, I have an inquiry about an e-book order.'
               )}`}

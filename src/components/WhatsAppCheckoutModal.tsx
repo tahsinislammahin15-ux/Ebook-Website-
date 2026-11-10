@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { X, Check, Copy, MessageSquareText, ShieldCheck, ExternalLink } from 'lucide-react';
+import { X, Check, Copy, MessageSquareText, ShieldCheck, ExternalLink, Tag, Sparkles, AlertCircle, QrCode, Smartphone } from 'lucide-react';
 
 export const WhatsAppCheckoutModal: React.FC = () => {
-  const { activeCheckoutBook, closeCheckout, settings, language, t } = useStore();
+  const { 
+    activeCheckoutBook, closeCheckout, settings, language, t,
+    coupons, activeCoupon, applyCoupon, removeCoupon 
+  } = useStore();
   
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -14,10 +17,42 @@ export const WhatsAppCheckoutModal: React.FC = () => {
   const [copiedText, setCopiedText] = useState(false);
   const [orderSent, setOrderSent] = useState(false);
 
+  // Coupon state
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [couponFeedback, setCouponFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   if (!activeCheckoutBook) return null;
 
   const title = language === 'bn' && activeCheckoutBook.titleBn ? activeCheckoutBook.titleBn : activeCheckoutBook.title;
   const author = language === 'bn' && activeCheckoutBook.authorBn ? activeCheckoutBook.authorBn : activeCheckoutBook.author;
+
+  // Calculate discount amount
+  let discountAmount = 0;
+  if (activeCoupon) {
+    if (activeCoupon.discountType === 'percentage') {
+      discountAmount = Math.round((activeCheckoutBook.price * activeCoupon.discountValue) / 100);
+    } else {
+      discountAmount = Math.min(activeCoupon.discountValue, activeCheckoutBook.price);
+    }
+  }
+  const finalPrice = Math.max(0, activeCheckoutBook.price - discountAmount);
+
+  const handleApplyCoupon = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!couponCodeInput.trim()) return;
+    const res = applyCoupon(couponCodeInput, activeCheckoutBook.price);
+    if (res.success) {
+      setCouponFeedback({ type: 'success', message: res.message });
+    } else {
+      setCouponFeedback({ type: 'error', message: res.message });
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    setCouponFeedback(null);
+    setCouponCodeInput('');
+  };
 
   const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
@@ -34,11 +69,18 @@ export const WhatsAppCheckoutModal: React.FC = () => {
 
   // Generate WhatsApp formatted text in Bengali or English
   const generateWhatsAppMessage = () => {
+    const couponLineBn = activeCoupon 
+      ? `\n*কুপন কোড:* ${activeCoupon.code} (-${settings.currencySymbol} ${discountAmount} ছাড়)\n*প্রদেয় সর্বমোট:* ${settings.currencySymbol} ${finalPrice} BDT` 
+      : '';
+    const couponLineEn = activeCoupon 
+      ? `\n*Coupon Code:* ${activeCoupon.code} (-${settings.currencySymbol} ${discountAmount} Discount)\n*Final Total:* ${settings.currencySymbol} ${finalPrice} BDT` 
+      : '';
+
     if (language === 'bn') {
       return `📚 *নতুন ই-বুক অর্ডার - ${settings.storeNameBn}*
 
 *বইয়ের নাম:* ${title}
-*মূল্য:* ${settings.currencySymbol} ${activeCheckoutBook.price} BDT
+*মূল্য:* ${settings.currencySymbol} ${activeCheckoutBook.price} BDT${couponLineBn}
 *ফরম্যাট:* ${activeCheckoutBook.format}
 
 *গ্রাহকের তথ্য:*
@@ -49,6 +91,7 @@ export const WhatsAppCheckoutModal: React.FC = () => {
 • মাধ্যম: ${paymentMethod} (${getMethodNumber().type})
 • যে নম্বর থেকে পাঠিয়েছেন: ${senderNumber.trim() || '[প্রেরকের নম্বর]'}
 • ট্রানজেকশন আইডি (TrxID): ${trxId.trim() || '[TrxID]'}
+• প্রেরিত টাকা: ${settings.currencySymbol} ${finalPrice} BDT
 
 অনুগ্রহ করে আমার পেমেন্ট যাচাই করে ই-বুক ডাউনলোডের লিংক দিন। ধন্যবাদ!`;
     }
@@ -56,7 +99,7 @@ export const WhatsAppCheckoutModal: React.FC = () => {
     return `📚 *New E-Book Order - ${settings.storeName}*
 
 *Book Title:* ${title}
-*Price:* ${settings.currencySymbol} ${activeCheckoutBook.price} BDT
+*Original Price:* ${settings.currencySymbol} ${activeCheckoutBook.price} BDT${couponLineEn}
 *Format:* ${activeCheckoutBook.format}
 
 *Customer Details:*
@@ -67,6 +110,7 @@ export const WhatsAppCheckoutModal: React.FC = () => {
 • Method: ${paymentMethod} (${getMethodNumber().type})
 • Sender Number: ${senderNumber.trim() || '[Sender Number]'}
 • Transaction ID (TrxID): ${trxId.trim() || '[TrxID]'}
+• Amount Paid: ${settings.currencySymbol} ${finalPrice} BDT
 
 Please verify my payment and send me the e-book download link. Thank you!`;
   };
@@ -188,34 +232,126 @@ Please verify my payment and send me the e-book download link. Thank you!`;
               </button>
             </div>
 
-            {/* Active Payment Number Box with 1-Click Copy */}
-            <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 flex items-center justify-between gap-3 sm:gap-4">
-              <div className="min-w-0">
-                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 block mb-0.5 truncate">
-                  {t.sendMoneyTo(paymentMethod, getMethodNumber().type)}
+            {/* Active Payment Number Box with 1-Click Copy & QR Code Scan Option */}
+            <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 block mb-0.5 truncate">
+                    {t.sendMoneyTo(paymentMethod, getMethodNumber().type)}
+                  </span>
+                  <span className="text-base sm:text-lg font-mono font-black text-slate-900 dark:text-white tracking-wider">
+                    {getMethodNumber().num}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(getMethodNumber().num, paymentMethod)}
+                  className="min-h-[42px] inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shrink-0 active:scale-95 shadow-xs"
+                >
+                  {copiedNumber === paymentMethod ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{t.copied}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{t.copyNumber}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Mobile Scan QR Pill */}
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{language === 'bn' ? 'বিকাশ/নগদ অ্যাপে "Send Money" অপশন থেকে পাঠান' : 'Use "Send Money" option in app'}</span>
                 </span>
-                <span className="text-base sm:text-lg font-mono font-bold text-slate-900 dark:text-white tracking-wider">
-                  {getMethodNumber().num}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {language === 'bn' ? 'ব্যক্তিগত নম্বর' : 'Personal No.'}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(getMethodNumber().num, paymentMethod)}
-                className="min-h-[42px] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shrink-0 active:scale-95"
-              >
-                {copiedNumber === paymentMethod ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{t.copied}</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>{t.copyNumber}</span>
-                  </>
-                )}
-              </button>
             </div>
+          </div>
+
+          {/* PROMO / COUPON CODE SECTION */}
+          <div className="p-4 rounded-xl border border-dashed border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{language === 'bn' ? 'কুপন বা ডিসকাউন্ট কোড' : 'Discount / Promo Code'}</span>
+              </label>
+              {activeCoupon && (
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold"
+                >
+                  {language === 'bn' ? 'কুপন মুছুন' : 'Remove'}
+                </button>
+              )}
+            </div>
+
+            {!activeCoupon ? (
+              <div>
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCodeInput}
+                    onChange={(e) => setCouponCodeInput(e.target.value)}
+                    placeholder={language === 'bn' ? 'যেমন: KITAB20 বা EID2026' : 'e.g. KITAB20 or EID2026'}
+                    className="flex-1 px-3 py-2.5 text-xs sm:text-sm font-mono uppercase font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:normal-case placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs shrink-0 active:scale-95"
+                  >
+                    {language === 'bn' ? 'প্রয়োগ করুন' : 'Apply'}
+                  </button>
+                </form>
+
+                {/* Available Coupons Hint Pills */}
+                {coupons.filter(c => c.isActive).length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>{language === 'bn' ? 'প্রযোজ্য কুপন:' : 'Available:'}</span>
+                    {coupons.filter(c => c.isActive).map(c => (
+                      <button
+                        type="button"
+                        key={c.code}
+                        onClick={() => {
+                          setCouponCodeInput(c.code);
+                          applyCoupon(c.code, activeCheckoutBook.price);
+                          setCouponFeedback({
+                            type: 'success',
+                            message: language === 'bn' ? `${c.code} কোড যোগ করা হয়েছে!` : `Applied ${c.code}!`
+                          });
+                        }}
+                        className="font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100/70 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
+                      >
+                        {c.code} ({c.discountType === 'percentage' ? `${c.discountValue}%` : `৳${c.discountValue}`})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>
+                    <strong>{activeCoupon.code}</strong> {language === 'bn' ? 'সফলভাবে প্রয়োগ হয়েছে! আপনি পাচ্ছেন' : 'applied! You save'} <strong>{settings.currencySymbol} {discountAmount}</strong> {language === 'bn' ? 'ছাড়' : 'off'}.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {couponFeedback && !activeCoupon && (
+              <div className={`text-xs flex items-center gap-1.5 ${couponFeedback.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {couponFeedback.type === 'error' ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : <Check className="w-3.5 h-3.5 shrink-0" />}
+                <span>{couponFeedback.message}</span>
+              </div>
+            )}
           </div>
 
           {/* STEP 2: Customer Details & Transaction ID */}
@@ -322,7 +458,24 @@ Please verify my payment and send me the e-book download link. Thank you!`;
         {/* Footer Actions */}
         <div className="p-4 sm:px-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-slate-500">
-            {t.totalPayable} <strong className="text-slate-900 dark:text-white font-mono">{settings.currencySymbol} {activeCheckoutBook.price}</strong>
+            {t.totalPayable}{' '}
+            {activeCoupon ? (
+              <span>
+                <span className="line-through text-slate-400 mr-1.5 font-mono">
+                  {settings.currencySymbol} {activeCheckoutBook.price}
+                </span>
+                <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                  {settings.currencySymbol} {finalPrice} BDT
+                </strong>
+                <span className="ml-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                  (-৳{discountAmount})
+                </span>
+              </span>
+            ) : (
+              <strong className="text-slate-900 dark:text-white font-mono text-sm">
+                {settings.currencySymbol} {activeCheckoutBook.price} BDT
+              </strong>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">

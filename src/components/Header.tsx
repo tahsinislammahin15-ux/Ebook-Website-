@@ -82,6 +82,12 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
             {t.howItWorks}
           </a>
           <a
+            href="#faq"
+            className="whitespace-nowrap shrink-0 hover:text-slate-900 dark:hover:text-white transition-colors"
+          >
+            {language === 'bn' ? 'সাধারণ প্রশ্ন' : 'FAQ'}
+          </a>
+          <a
             href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(
               language === 'bn'
                 ? 'হ্যালো, বইঘর থেকে ই-বুক সম্পর্কে জানতে চাই।'

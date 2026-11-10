@@ -11,6 +11,13 @@ import { HowItWorks } from './components/HowItWorks';
 import { Footer } from './components/Footer';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DynamicSEO } from './components/DynamicSEO';
+import { FAQSection } from './components/FAQSection';
+import { LiveSalesNotification } from './components/LiveSalesNotification';
+import { FlashSaleBanner } from './components/FlashSaleBanner';
+import { ReadingResumeBanner } from './components/ReadingResumeBanner';
+import { ComboDealsSection } from './components/ComboDealsSection';
+import { ReviewsSection } from './components/ReviewsSection';
+import { DownloadGiftModal } from './components/DownloadGiftModal';
 import { BookX } from 'lucide-react';
 
 function StorefrontContent() {
@@ -127,8 +134,14 @@ function StorefrontContent() {
       {/* Dynamic SEO & Social Share Metadata Management */}
       <DynamicSEO />
 
-      {/* Top Bar */}
+      {/* 1. Live Countdown Flash Sale Banner */}
+      <FlashSaleBanner />
+
+      {/* Top Navigation Bar */}
       <Header onSelectCategory={handleSelectNavCategory} activeFilter={typeFilter} />
+
+      {/* 2. Personalized Reading History & Resume Strip */}
+      <ReadingResumeBanner />
 
       {/* Hero Section */}
       <Hero
@@ -283,11 +296,23 @@ function StorefrontContent() {
 
       </main>
 
+      {/* 3. Combo Bundle Deals Section */}
+      <ComboDealsSection />
+
       {/* How It Works Section */}
       <HowItWorks />
 
+      {/* 4. Customer Verified Reviews & 5-Star Ratings */}
+      <ReviewsSection />
+
+      {/* FAQ (Frequently Asked Questions) Section */}
+      <FAQSection />
+
       {/* Footer */}
       <Footer />
+
+      {/* Live Sales Proof Floating Notification */}
+      <LiveSalesNotification />
 
       {/* Mobile Sticky Thumb Navigation (Active on Mobile & Tablet viewports) */}
       <MobileBottomNav onSelectCategory={handleSelectNavCategory} activeFilter={typeFilter} />
@@ -297,6 +322,7 @@ function StorefrontContent() {
       <WhatsAppCheckoutModal />
       <AdminModal />
       <WishlistDrawer />
+      <DownloadGiftModal />
     </div>
   );
 }

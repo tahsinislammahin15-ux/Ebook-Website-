@@ -1,4 +1,4 @@
-import { Ebook, StoreSettings } from '../types/ebook';
+import { Ebook, StoreSettings, Coupon } from '../types/ebook';
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   storeName: "KitabGhar",
@@ -30,7 +30,33 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     canonicalUrl: "",
     twitterHandle: "@kitabghar",
     siteName: "KitabGhar"
-  }
+  },
+  coupons: [
+    {
+      code: "KITAB20",
+      discountType: "percentage",
+      discountValue: 20,
+      description: "20% Discount on all paid e-books",
+      descriptionBn: "সব পেইড ই-বুকে ২০% বিশেষ ছাড়",
+      isActive: true
+    },
+    {
+      code: "TAHSIN50",
+      discountType: "fixed",
+      discountValue: 50,
+      description: "Flat ৳50 Discount",
+      descriptionBn: "ফ্ল্যাট ৫০ টাকা নগদ ছাড়",
+      isActive: true
+    },
+    {
+      code: "EID2026",
+      discountType: "percentage",
+      discountValue: 25,
+      description: "25% Special Festive Discount",
+      descriptionBn: "২৫% উৎসব স্পেশাল ছাড়",
+      isActive: true
+    }
+  ]
 };
 
 export const DEFAULT_EBOOKS: Ebook[] = [
