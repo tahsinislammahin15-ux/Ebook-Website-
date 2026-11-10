@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Ebook } from '../types/ebook';
+import { Ebook, SEOSettings } from '../types/ebook';
+import { DEFAULT_STORE_SETTINGS } from '../data/defaultProducts';
 import { 
   X, Shield, Lock, Plus, Edit2, Trash2, Download, Save, 
   RotateCcw, Check, AlertCircle, FileCode, Smartphone, BookOpen, Layers,
-  LogOut, Eye, EyeOff, User, KeyRound, Clock
+  LogOut, Eye, EyeOff, User, KeyRound, Clock, Globe, Share2, Sparkles, Copy, ExternalLink, CheckCheck
 } from 'lucide-react';
 
 const LOCKOUT_KEY = 'kitabghor_admin_lockout';
@@ -45,7 +46,7 @@ export const AdminModal: React.FC = () => {
     }
   });
 
-  const [activeTab, setActiveTab] = useState<'books' | 'settings' | 'cpanel'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'settings' | 'cpanel' | 'seo'>('books');
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
@@ -81,7 +82,34 @@ export const AdminModal: React.FC = () => {
 
   // Settings form state
   const [settingsForm, setSettingsForm] = useState(settings);
+  const [seoForm, setSeoForm] = useState<SEOSettings>(() => {
+    return settings.seo || DEFAULT_STORE_SETTINGS.seo || {
+      metaTitle: "KitabGhar - Digital E-Book Store | Free & Paid E-Books",
+      metaTitleBn: "কিতাবঘর - ডিজিটাল ই-বুক স্টোর ও হোয়াটসঅ্যাপ অর্ডার",
+      metaDescription: "Download free curated e-books or buy premium guides with instant WhatsApp ordering and bKash/Nagad verification in Bangladesh.",
+      metaDescriptionBn: "ফ্রি ও পেইড বাংলা-ইংরেজি ই-বুক ডাউনলোড করুন। বিকাশ ও নগদ পেমেন্ট ভেরিফিকেশন সহ হোয়াটসঅ্যাপে সরাসরি অর্ডার করুন।",
+      ogTitle: "KitabGhar - Your Ultimate Book Home",
+      ogTitleBn: "কিতাবঘর - আপনার বইয়ের নির্ভরযোগ্য ঠিকানা",
+      ogDescription: "Discover high-impact programming, freelancing, and business e-books. Instant free downloads and 1-click WhatsApp checkout.",
+      ogDescriptionBn: "প্রোগ্রামিং, ফ্রিল্যান্সিং ও ক্যারিয়ার বিষয়ক সেরা ই-বুক সংগ্রহ। ফ্রি ডাউনলোড এবং বিকাশ ও নগদে সহজ হোয়াটসঅ্যাপ অর্ডার।",
+      ogImage: "/assets/aistudio/1794301559714_e54adc4f.jpg",
+      keywords: "kitabghar, bangla ebook, free ebook download, pdf download bangladesh, bkash payment, nagad payment, programming books, freelancing bangla, startup playbook, কিতাবঘর, বাংলা বই",
+      author: "Tahsin Islam",
+      canonicalUrl: "",
+      twitterHandle: "@kitabghar",
+      siteName: "KitabGhar"
+    };
+  });
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [autoOptimizedNotice, setAutoOptimizedNotice] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    setSettingsForm(settings);
+    if (settings.seo) {
+      setSeoForm(settings.seo);
+    }
+  }, [settings]);
 
   // Lockout countdown timer
   useEffect(() => {
@@ -261,6 +289,71 @@ export const AdminModal: React.FC = () => {
     updateSettings(settingsForm);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  const handleSaveSEO = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings({ seo: seoForm });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  const handleAutoOptimizeSEO = () => {
+    const freeCount = ebooks.filter(b => b.type === 'free').length;
+    const paidCount = ebooks.filter(b => b.type === 'paid').length;
+    const store = settings.storeName || 'KitabGhar';
+    const storeBn = settings.storeNameBn || 'কিতাবঘর';
+
+    const optimized: SEOSettings = {
+      ...seoForm,
+      metaTitle: `${store} - Best Digital E-Book Store in Bangladesh | Free & Paid PDF`,
+      metaTitleBn: `${storeBn} - বাংলাদেশের সেরা ই-বুক স্টোর | ফ্রি ও পেইড বই`,
+      metaDescription: `Explore ${ebooks.length}+ curated e-books on ${store}. ${freeCount} free direct downloads and ${paidCount} premium guides with instant WhatsApp ordering and bKash/Nagad verification in BDT.`,
+      metaDescriptionBn: `${storeBn}-এ রয়েছে ${ebooks.length}+ টি সেরা ই-বুক। ${freeCount}টি ফ্রি বই সরাসরি ডাউনলোড করুন এবং ${paidCount}টি প্রিমিয়াম বই বিকাশ ও নগদে হোয়াটসঅ্যাপে অর্ডার করুন।`,
+      ogTitle: `${store} - Your Ultimate E-Book Home in Bangladesh`,
+      ogTitleBn: `${storeBn} - আপনার নির্ভরযোগ্য ডিজিটাল বইয়ের ঠিকানা`,
+      ogDescription: `Instant PDF downloads and WhatsApp mobile banking checkout for programming, freelancing, and business guides.`,
+      ogDescriptionBn: `প্রোগ্রামিং, ফ্রিল্যান্সিং ও ক্যারিয়ারের সেরা বই পড়ুন। ফ্রি ডাউনলোড এবং বিকাশ ও নগদে সহজ হোয়াটসঅ্যাপ অর্ডার।`,
+      keywords: `${store.toLowerCase()}, bangla ebook, pdf download bd, bkash payment ebook, freelancing bangla pdf, programming book bangla, kitabghar e-book, কিতাবঘর, ফ্রি বই ডাউনলোড`,
+      author: settings.adminUsername || "Tahsin Islam",
+      siteName: store
+    };
+
+    setSeoForm(optimized);
+    setAutoOptimizedNotice(true);
+    setTimeout(() => setAutoOptimizedNotice(false), 3000);
+  };
+
+  const generateStaticHTMLSnippet = () => {
+    const isBn = language === 'bn';
+    const activeTitle = (isBn ? (seoForm.metaTitleBn || seoForm.metaTitle) : seoForm.metaTitle) || 'KitabGhar - Digital E-Book Store';
+    const activeDesc = (isBn ? (seoForm.metaDescriptionBn || seoForm.metaDescription) : seoForm.metaDescription) || '';
+    const ogTitle = (isBn ? (seoForm.ogTitleBn || seoForm.ogTitle) : seoForm.ogTitle) || activeTitle;
+    const ogDesc = (isBn ? (seoForm.ogDescriptionBn || seoForm.ogDescription) : seoForm.ogDescription) || activeDesc;
+    const rawImage = seoForm.ogImage || settings.logoUrl || '/assets/aistudio/1794301559714_e54adc4f.jpg';
+    const canonical = seoForm.canonicalUrl || 'https://yourdomain.com';
+
+    return `<!-- KitabGhar Production SEO & OpenGraph Meta Tags -->
+<title>${activeTitle}</title>
+<meta name="description" content="${activeDesc}" />
+<meta name="keywords" content="${seoForm.keywords}" />
+<meta name="author" content="${seoForm.author}" />
+<link rel="canonical" href="${canonical}" />
+
+<!-- OpenGraph / Facebook / WhatsApp -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="${ogTitle}" />
+<meta property="og:description" content="${ogDesc}" />
+<meta property="og:image" content="${rawImage}" />
+<meta property="og:url" content="${canonical}" />
+<meta property="og:site_name" content="${seoForm.siteName || settings.storeName}" />
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${ogTitle}" />
+<meta name="twitter:description" content="${ogDesc}" />
+<meta name="twitter:image" content="${rawImage}" />
+${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterHandle}" />` : ''}`;
   };
 
   return (
@@ -461,6 +554,17 @@ export const AdminModal: React.FC = () => {
                   <Layers className="w-3.5 h-3.5" />
                   <span>{language === 'bn' ? 'সিপ্যানেল গাইড ও এক্সপোর্ট' : 'cPanel Guide & Export'}</span>
                 </button>
+                <button
+                  onClick={() => setActiveTab('seo')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'seo'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'এসইও ও সোশ্যাল শেয়ার' : 'SEO & Social Cards'}</span>
+                </button>
               </div>
 
               {/* 1-Click Export products.json button */}
@@ -619,6 +723,24 @@ export const AdminModal: React.FC = () => {
                             placeholder="/src/assets/images/... or https://..."
                             className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
+                        </div>
+
+                        <div>
+                          <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">
+                            {language === 'bn' ? 'ই-বুক / PDF ফাইলের লিংক (Download URL)' : 'PDF Download URL / Link'}
+                          </label>
+                          <input
+                            type="text"
+                            value={bookForm.downloadUrl || ''}
+                            onChange={(e) => setBookForm({ ...bookForm, downloadUrl: e.target.value })}
+                            placeholder={language === 'bn' ? '/ebooks/my-book.pdf অথবা গুগল ড্রাইভ লিংক' : '/ebooks/my-book.pdf or Google Drive link'}
+                            className="w-full px-3 py-2 rounded-lg border border-emerald-500/60 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                          <span className="text-[10px] text-slate-400 mt-0.5 block">
+                            {language === 'bn' 
+                              ? 'cPanel-এর public_html/ebooks ফোল্ডারে PDF ফাইল রেখে এখানে /ebooks/বইয়ের-নাম.pdf দিন।' 
+                              : 'Upload PDF to public_html/ebooks/ and put /ebooks/file.pdf here.'}
+                          </span>
                         </div>
                       </div>
 
@@ -999,6 +1121,473 @@ export const AdminModal: React.FC = () => {
                       </li>
                     </ol>
                   </div>
+
+                </div>
+              )}
+
+              {/* TAB 4: DEDICATED SEO & OPENGRAPH MANAGEMENT */}
+              {activeTab === 'seo' && (
+                <div className="space-y-8 text-xs leading-relaxed">
+                  
+                  {/* Top Bar with Description & Quick Tools */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>{language === 'bn' ? 'এসইও ও সোশ্যাল শেয়ার সেটিংস' : 'Search Engine & OpenGraph Management'}</span>
+                      </h4>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+                        {language === 'bn'
+                          ? 'গুগল সার্চ ও ফেসবুক/হোয়াটসঅ্যাপে লিংক শেয়ার করার সময় আপনার ওয়েবসাইটের টাইটেল, ছবি ও বিবরণ এখান থেকে কাস্টমাইজ করুন।'
+                          : 'Control how your website appears on Google Search, WhatsApp, Facebook, X (Twitter), and LinkedIn.'}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleAutoOptimizeSEO}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors shadow-xs active:scale-95"
+                        title="Auto-generate optimized SEO titles and descriptions based on your store data"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{language === 'bn' ? 'অটো-অপ্টিমাইজ করুন' : 'Auto-Optimize'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const snippet = generateStaticHTMLSnippet();
+                          navigator.clipboard.writeText(snippet);
+                          setCopiedSnippet(true);
+                          setTimeout(() => setCopiedSnippet(false), 2500);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 transition-colors shadow-xs active:scale-95"
+                        title="Copy static HTML meta tags to paste into index.html for cPanel"
+                      >
+                        {copiedSnippet ? (
+                          <>
+                            <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{language === 'bn' ? 'কপি হয়েছে!' : 'Copied!'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>{language === 'bn' ? 'HTML ট্যাগ কপি' : 'Copy HTML'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {autoOptimizedNotice && (
+                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{language === 'bn' ? 'আপনার স্টোর ও বইয়ের তথ্যের ভিত্তিতে এসইও ট্যাগ অপ্টিমাইজ করা হয়েছে! নিচে চেক করে সেভ করুন।' : 'SEO tags have been auto-optimized based on your store and catalog!'}</span>
+                    </div>
+                  )}
+
+                  {/* REAL-TIME PREVIEW SECTION */}
+                  <div className="space-y-4">
+                    <h5 className="text-xs uppercase font-extrabold tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'bn' ? 'লাইভ সোশ্যাল শেয়ার ও সার্চ রেজাল্ট প্রিভিউ' : 'Live Social & Search Snippet Previews'}</span>
+                    </h5>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      
+                      {/* PREVIEW 1: WhatsApp / Facebook OpenGraph Card */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{language === 'bn' ? 'হোয়াটসঅ্যাপ ও ফেসবুক শেয়ার কার্ড' : 'WhatsApp & Facebook Share Card'}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400">OpenGraph Preview</span>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+                          {/* Card Banner Image */}
+                          <div className="relative aspect-16/9 w-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
+                            {seoForm.ogImage ? (
+                              <img
+                                src={seoForm.ogImage}
+                                alt="Social Share Preview"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to logo
+                                  (e.target as HTMLImageElement).src = settings.logoUrl || '/assets/aistudio/1794301559714_e54adc4f.jpg';
+                                }}
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center p-6 text-slate-400 text-xs">
+                                No image provided
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Card Text Content */}
+                          <div className="p-3.5 space-y-1 bg-slate-50/60 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                              {seoForm.canonicalUrl 
+                                ? seoForm.canonicalUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
+                                : 'YOURDOMAIN.COM'}
+                            </span>
+                            <h6 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                              {language === 'bn' ? (seoForm.ogTitleBn || seoForm.ogTitle) : seoForm.ogTitle}
+                            </h6>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                              {language === 'bn' ? (seoForm.ogDescriptionBn || seoForm.ogDescription) : seoForm.ogDescription}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PREVIEW 2: Google Search Snippet (SERP) */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{language === 'bn' ? 'গুগল সার্চ রেজাল্ট প্রিভিউ' : 'Google Search Snippet Preview'}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400">SERP Result</span>
+                        </div>
+
+                        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-1.5 font-sans">
+                          {/* Breadcrumb & Site Name */}
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-5 h-5 rounded-full overflow-hidden bg-white border border-slate-200 dark:border-slate-700 shrink-0 p-0.5">
+                              <img src={settings.logoUrl || "/assets/aistudio/1794301559714_e54adc4f.jpg"} alt="" className="w-full h-full object-contain" />
+                            </div>
+                            <div className="truncate">
+                              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                {seoForm.siteName || settings.storeName}
+                              </span>
+                              <span className="text-[11px] text-slate-400 block truncate">
+                                {seoForm.canonicalUrl || 'https://yourdomain.com'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Blue Clickable Title */}
+                          <h6 className="text-sm sm:text-base font-medium text-blue-700 dark:text-blue-400 hover:underline cursor-pointer line-clamp-1 leading-snug">
+                            {language === 'bn' ? (seoForm.metaTitleBn || seoForm.metaTitle) : seoForm.metaTitle}
+                          </h6>
+
+                          {/* Snippet Description */}
+                          <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                            {language === 'bn' ? (seoForm.metaDescriptionBn || seoForm.metaDescription) : seoForm.metaDescription}
+                          </p>
+
+                          {/* Character Count Quality Indicators */}
+                          <div className="pt-2 flex items-center gap-3 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800">
+                            <span>
+                              Title: <strong className={(seoForm.metaTitle.length >= 30 && seoForm.metaTitle.length <= 60) ? 'text-emerald-600' : 'text-amber-500'}>
+                                {seoForm.metaTitle.length} chars
+                              </strong> (Optimal: 30-60)
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Desc: <strong className={(seoForm.metaDescription.length >= 120 && seoForm.metaDescription.length <= 160) ? 'text-emerald-600' : 'text-amber-500'}>
+                                {seoForm.metaDescription.length} chars
+                              </strong> (Optimal: 120-160)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* SEO EDITING FORM */}
+                  <form onSubmit={handleSaveSEO} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-6">
+                    
+                    {/* SECTION 1: Search Engine Titles */}
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                          {language === 'bn' ? '১. সার্চ ইঞ্জিন মেটা টাইটেল (Title Tags)' : '1. Search Engine Title Tags'}
+                        </h5>
+                        <p className="text-slate-400 text-[11px]">
+                          ব্রাউজার ট্যাব এবং গুগলের নীল লিংকে এই টাইটেল প্রদর্শিত হবে (সর্বোত্তম দৈর্ঘ্য: ৩০–৬০ অক্ষর)।
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700 dark:text-slate-300">
+                              Meta Title (English) *
+                            </label>
+                            <span className={`text-[10px] font-mono ${seoForm.metaTitle.length > 60 ? 'text-amber-500 font-bold' : 'text-slate-400'}`}>
+                              {seoForm.metaTitle.length}/60
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            required
+                            value={seoForm.metaTitle}
+                            onChange={(e) => setSeoForm({ ...seoForm, metaTitle: e.target.value })}
+                            placeholder="e.g. KitabGhar - Digital E-Book Store | Free & Paid Books"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700 dark:text-slate-300">
+                              মেটা টাইটেল (বাংলা)
+                            </label>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {seoForm.metaTitleBn.length} chars
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            value={seoForm.metaTitleBn}
+                            onChange={(e) => setSeoForm({ ...seoForm, metaTitleBn: e.target.value })}
+                            placeholder="যেমন: কিতাবঘর - ডিজিটাল ই-বুক স্টোর ও হোয়াটসঅ্যাপ অর্ডার"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: Search Engine Meta Descriptions */}
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                          {language === 'bn' ? '২. সার্চ ইঞ্জিন মেটা বিবরণ (Meta Description)' : '2. Search Engine Meta Description'}
+                        </h5>
+                        <p className="text-slate-400 text-[11px]">
+                          গুগল সার্চ রেজাল্ট এবং সোশ্যাল মিডিয়ায় টাইটেলের নিচে ১–২ লাইনের সংক্ষিপ্ত বিবরণ (সর্বোত্তম দৈর্ঘ্য: ১২০–১৬০ অক্ষর)।
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700 dark:text-slate-300">
+                              Meta Description (English) *
+                            </label>
+                            <span className={`text-[10px] font-mono ${seoForm.metaDescription.length > 160 ? 'text-amber-500 font-bold' : 'text-slate-400'}`}>
+                              {seoForm.metaDescription.length}/160
+                            </span>
+                          </div>
+                          <textarea
+                            rows={3}
+                            required
+                            value={seoForm.metaDescription}
+                            onChange={(e) => setSeoForm({ ...seoForm, metaDescription: e.target.value })}
+                            placeholder="Download free curated e-books or buy premium tech guides with instant WhatsApp checkout and bKash/Nagad verification in Bangladesh."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white leading-relaxed"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700 dark:text-slate-300">
+                              মেটা বিবরণ (বাংলা)
+                            </label>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {seoForm.metaDescriptionBn.length} chars
+                            </span>
+                          </div>
+                          <textarea
+                            rows={3}
+                            value={seoForm.metaDescriptionBn}
+                            onChange={(e) => setSeoForm({ ...seoForm, metaDescriptionBn: e.target.value })}
+                            placeholder="ফ্রি ও পেইড বাংলা-ইংরেজি ই-বুক ডাউনলোড করুন। বিকাশ ও নগদ পেমেন্ট ভেরিফিকেশন সহ হোয়াটসঅ্যাপে সরাসরি অর্ডার করুন।"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: OpenGraph & Social Media Cards */}
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                          {language === 'bn' ? '৩. ওপেন-গ্রাফ ও সোশ্যাল মিডিয়া শেয়ার কার্ড (OpenGraph & Twitter)' : '3. OpenGraph & Social Cards (WhatsApp / FB / X)'}
+                        </h5>
+                        <p className="text-slate-400 text-[11px]">
+                          হোয়াটসঅ্যাপে বা ফেসবুকে লিংক পাঠালে যে বড় ব্যানার ও টেক্সট ভেসে ওঠে।
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Social Share Title (og:title)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.ogTitle}
+                            onChange={(e) => setSeoForm({ ...seoForm, ogTitle: e.target.value })}
+                            placeholder="KitabGhar - Your Ultimate Book Home"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            সোশ্যাল শেয়ার টাইটেল (বাংলা)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.ogTitleBn || ''}
+                            onChange={(e) => setSeoForm({ ...seoForm, ogTitleBn: e.target.value })}
+                            placeholder="কিতাবঘর - আপনার বইয়ের নির্ভরযোগ্য ঠিকানা"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Social Share Description (og:description)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.ogDescription}
+                            onChange={(e) => setSeoForm({ ...seoForm, ogDescription: e.target.value })}
+                            placeholder="Discover high-impact programming, freelancing, and business e-books. Instant free downloads and 1-click WhatsApp checkout."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Social Share Image URL (og:image)
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center p-1">
+                              <img
+                                src={seoForm.ogImage || settings.logoUrl || '/assets/aistudio/1794301559714_e54adc4f.jpg'}
+                                alt="Thumb"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              value={seoForm.ogImage}
+                              onChange={(e) => setSeoForm({ ...seoForm, ogImage: e.target.value })}
+                              placeholder="/assets/aistudio/1794301559714_e54adc4f.jpg or https://..."
+                              className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            />
+                          </div>
+                          <span className="text-[10px] text-slate-400 mt-1 block">
+                            {language === 'bn' 
+                              ? 'সোশ্যাল কার্ডে প্রদর্শনের জন্য ১২০০x৬৩০ সাইজের ব্যানার বা আপনার স্টোর লোগোর পাথ দিন।' 
+                              : 'Recommended 1200x630 image or store logo asset path.'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 4: Discovery, Canonical & Verification */}
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                          {language === 'bn' ? '৪. কিওয়ার্ডস, ক্যানোনিকাল ও অথর মেটাডাটা' : '4. Keywords, Canonical URL & Attribution'}
+                        </h5>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Meta Keywords (কমা দিয়ে আলাদা করুন)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.keywords}
+                            onChange={(e) => setSeoForm({ ...seoForm, keywords: e.target.value })}
+                            placeholder="kitabghar, bangla ebook, pdf download, bkash payment, nagad payment, programming books, freelancing bangla"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Canonical URL (কাস্টম ডোমেইন)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.canonicalUrl || ''}
+                            onChange={(e) => setSeoForm({ ...seoForm, canonicalUrl: e.target.value })}
+                            placeholder="https://yourdomain.com"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Twitter / X Handle
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.twitterHandle || ''}
+                            onChange={(e) => setSeoForm({ ...seoForm, twitterHandle: e.target.value })}
+                            placeholder="@kitabghar"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Author / Founder Name
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.author}
+                            onChange={(e) => setSeoForm({ ...seoForm, author: e.target.value })}
+                            placeholder="Tahsin Islam"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Site Brand Name (og:site_name)
+                          </label>
+                          <input
+                            type="text"
+                            value={seoForm.siteName || ''}
+                            onChange={(e) => setSeoForm({ ...seoForm, siteName: e.target.value })}
+                            placeholder="KitabGhar"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Submit Bar */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-[11px] text-slate-400">
+                        {language === 'bn' 
+                          ? 'সেভ করলে ব্রাউজার ও ওপেনগ্রাফ মেটাডাটা তাৎক্ষণিক আপডেট হবে।' 
+                          : 'Changes take effect immediately across browser title and metadata.'}
+                      </p>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={handleAutoOptimizeSEO}
+                          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full sm:w-auto"
+                        >
+                          {language === 'bn' ? 'রিসেট / অপ্টিমাইজ' : 'Re-Optimize'}
+                        </button>
+
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm hover:shadow-md text-xs w-full sm:w-auto cursor-pointer"
+                        >
+                          <Save className="w-4 h-4" />
+                          <span>{language === 'bn' ? 'এসইও সেটিংস সেভ করুন' : 'Save SEO Settings'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                  </form>
 
                 </div>
               )}

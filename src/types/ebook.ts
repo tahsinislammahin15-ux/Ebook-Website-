@@ -45,6 +45,24 @@ export interface StoreSettings {
   currencySymbol: string;
   adminUsername: string; // e.g. "tahsinislam"
   adminPasscode: string;
+  seo?: SEOSettings;
+}
+
+export interface SEOSettings {
+  metaTitle: string;
+  metaTitleBn: string;
+  metaDescription: string;
+  metaDescriptionBn: string;
+  ogTitle: string;
+  ogTitleBn?: string;
+  ogDescription: string;
+  ogDescriptionBn?: string;
+  ogImage: string;
+  keywords: string;
+  author: string;
+  canonicalUrl?: string;
+  twitterHandle?: string;
+  siteName?: string;
 }
 
 export type SiteLanguage = 'bn' | 'en';

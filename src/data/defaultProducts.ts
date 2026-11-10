@@ -14,7 +14,23 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   nagadType: "Personal",
   currencySymbol: "৳",
   adminUsername: "tahsinislam",
-  adminPasscode: "tahsinislam4567" // User's requested admin password
+  adminPasscode: "tahsinislam4567", // User's requested admin password
+  seo: {
+    metaTitle: "KitabGhar - Digital E-Book Store | Free & Paid E-Books",
+    metaTitleBn: "কিতাবঘর - ডিজিটাল ই-বুক স্টোর ও হোয়াটসঅ্যাপ অর্ডার",
+    metaDescription: "Download free curated e-books or buy premium guides with instant WhatsApp ordering and bKash/Nagad verification in Bangladesh.",
+    metaDescriptionBn: "ফ্রি ও পেইড বাংলা-ইংরেজি ই-বুক ডাউনলোড করুন। বিকাশ ও নগদ পেমেন্ট ভেরিফিকেশন সহ হোয়াটসঅ্যাপে সরাসরি অর্ডার করুন।",
+    ogTitle: "KitabGhar - Your Ultimate Book Home",
+    ogTitleBn: "কিতাবঘর - আপনার বইয়ের নির্ভরযোগ্য ঠিকানা",
+    ogDescription: "Discover high-impact programming, freelancing, and business e-books. Instant free downloads and 1-click WhatsApp checkout.",
+    ogDescriptionBn: "প্রোগ্রামিং, ফ্রিল্যান্সিং ও ক্যারিয়ার বিষয়ক সেরা ই-বুক সংগ্রহ। ফ্রি ডাউনলোড এবং বিকাশ ও নগদে সহজ হোয়াটসঅ্যাপ অর্ডার।",
+    ogImage: "/assets/aistudio/1794301559714_e54adc4f.jpg",
+    keywords: "kitabghar, bangla ebook, free ebook download, pdf download bangladesh, bkash payment, nagad payment, programming books, freelancing bangla, startup playbook, কিতাবঘর, বাংলা বই",
+    author: "Tahsin Islam",
+    canonicalUrl: "",
+    twitterHandle: "@kitabghar",
+    siteName: "KitabGhar"
+  }
 };
 
 export const DEFAULT_EBOOKS: Ebook[] = [

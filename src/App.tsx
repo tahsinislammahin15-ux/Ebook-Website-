@@ -10,6 +10,7 @@ import { WishlistDrawer } from './components/WishlistDrawer';
 import { HowItWorks } from './components/HowItWorks';
 import { Footer } from './components/Footer';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { DynamicSEO } from './components/DynamicSEO';
 import { BookX } from 'lucide-react';
 
 function StorefrontContent() {
@@ -123,6 +124,9 @@ function StorefrontContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors pb-20 lg:pb-0">
+      {/* Dynamic SEO & Social Share Metadata Management */}
+      <DynamicSEO />
+
       {/* Top Bar */}
       <Header onSelectCategory={handleSelectNavCategory} activeFilter={typeFilter} />
 
