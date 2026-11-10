@@ -29,10 +29,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Application (Vite)
         run: npm run build
@@ -44,7 +43,6 @@ jobs:
           path: dist/
           retention-days: 30
 
-  # Optional GitHub Pages Deployment Job
   deploy-github-pages:
     name: Deploy to GitHub Pages (Optional)
     needs: build
@@ -58,10 +56,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Application
         run: npm run build
