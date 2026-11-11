@@ -23,7 +23,7 @@ export const DownloadGiftModal: React.FC = () => {
 
   if (!downloadGiftModalBook) return null;
 
-  const promoCode = 'FIRST20';
+  const promoCode = settings.downloadGiftCouponCode || 'FIRST20';
   const title = language === 'bn' && downloadGiftModalBook.titleBn ? downloadGiftModalBook.titleBn : downloadGiftModalBook.title;
 
   const handleCopyCode = () => {

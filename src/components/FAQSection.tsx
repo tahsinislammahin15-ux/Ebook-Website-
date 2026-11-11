@@ -66,6 +66,11 @@ export const FAQSection: React.FC = () => {
   const { language, settings } = useStore();
   const [openId, setOpenId] = useState<string | null>('faq-1');
 
+  if (settings.showFaqSection === false) return null;
+
+  const faqList = settings.faqs && settings.faqs.length > 0 ? settings.faqs : FAQS;
+  const ICONS = [CreditCard, MessageSquareText, Smartphone, Download, Tag, ShieldCheck, HelpCircle];
+
   const toggleFAQ = (id: string) => {
     setOpenId(prev => (prev === id ? null : id));
   };
@@ -96,11 +101,11 @@ export const FAQSection: React.FC = () => {
 
         {/* FAQ Accordion List */}
         <div className="space-y-3">
-          {FAQS.map((item) => {
+          {faqList.map((item, idx) => {
             const isOpen = openId === item.id;
-            const Icon = item.icon;
-            const q = language === 'bn' ? item.questionBn : item.question;
-            const a = language === 'bn' ? item.answerBn : item.answer;
+            const Icon = ICONS[idx % ICONS.length];
+            const q = language === 'bn' ? (item.questionBn || item.question) : item.question;
+            const a = language === 'bn' ? (item.answerBn || item.answer) : item.answer;
 
             return (
               <div

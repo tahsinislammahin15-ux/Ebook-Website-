@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { X, Check, Copy, MessageSquareText, ShieldCheck, ExternalLink, Tag, Sparkles, AlertCircle, QrCode, Smartphone } from 'lucide-react';
+import { X, Check, Copy, MessageSquareText, ShieldCheck, ExternalLink, Tag, Sparkles, AlertCircle, QrCode, Smartphone, Gift, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const WhatsAppCheckoutModal: React.FC = () => {
   const { 
@@ -13,6 +13,15 @@ export const WhatsAppCheckoutModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad'>('bKash');
   const [senderNumber, setSenderNumber] = useState('');
   const [trxId, setTrxId] = useState('');
+  const [hasScreenshotProof, setHasScreenshotProof] = useState(false);
+  const [screenshotFileName, setScreenshotFileName] = useState<string | null>(null);
+
+  // Gift Option state
+  const [isGift, setIsGift] = useState(false);
+  const [giftRecipientName, setGiftRecipientName] = useState('');
+  const [giftRecipientPhone, setGiftRecipientPhone] = useState('');
+  const [giftMessage, setGiftMessage] = useState('');
+
   const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [orderSent, setOrderSent] = useState(false);
@@ -76,6 +85,19 @@ export const WhatsAppCheckoutModal: React.FC = () => {
       ? `\n*Coupon Code:* ${activeCoupon.code} (-${settings.currencySymbol} ${discountAmount} Discount)\n*Final Total:* ${settings.currencySymbol} ${finalPrice} BDT` 
       : '';
 
+    const giftSectionBn = isGift ? `\n\n🎁 *উপহার অর্ডার (Gift Delivery):*
+• প্রাপকের নাম: ${giftRecipientName.trim() || '[প্রাপকের নাম]'}
+• প্রাপকের হোয়াটসঅ্যাপ: ${giftRecipientPhone.trim() || '[প্রাপকের নম্বর]'}
+${giftMessage.trim() ? `• বার্তা: "${giftMessage.trim()}"\n` : ''}` : '';
+
+    const giftSectionEn = isGift ? `\n\n🎁 *Gift Order (Deliver to Friend):*
+• Recipient Name: ${giftRecipientName.trim() || '[Recipient Name]'}
+• Recipient WhatsApp: ${giftRecipientPhone.trim() || '[Recipient Phone]'}
+${giftMessage.trim() ? `• Gift Note: "${giftMessage.trim()}"\n` : ''}` : '';
+
+    const screenshotProofNoteBn = hasScreenshotProof ? `\n• পেমেন্ট প্রুফ: পেমেন্ট স্ক্রিনশট সংযুক্ত (এই চ্যাটে পাঠানো হবে)` : '';
+    const screenshotProofNoteEn = hasScreenshotProof ? `\n• Proof: Payment screenshot ready (sending in this chat)` : '';
+
     if (language === 'bn') {
       return `📚 *নতুন ই-বুক অর্ডার - ${settings.storeNameBn}*
 
@@ -84,13 +106,13 @@ export const WhatsAppCheckoutModal: React.FC = () => {
 *ফরম্যাট:* ${activeCheckoutBook.format}
 
 *গ্রাহকের তথ্য:*
-• নাম: ${customerName.trim() || '[গ্রাহকের নাম]'}
-• হোয়াটসঅ্যাপ নম্বর: ${customerPhone.trim() || '[ফোন নম্বর]'}
+• ক্রেতার নাম: ${customerName.trim() || '[গ্রাহকের নাম]'}
+• ক্রেতার হোয়াটসঅ্যাপ: ${customerPhone.trim() || '[ফোন নম্বর]'}${giftSectionBn}
 
 *পেমেন্ট ভেরিফিকেশন তথ্য:*
 • মাধ্যম: ${paymentMethod} (${getMethodNumber().type})
 • যে নম্বর থেকে পাঠিয়েছেন: ${senderNumber.trim() || '[প্রেরকের নম্বর]'}
-• ট্রানজেকশন আইডি (TrxID): ${trxId.trim() || '[TrxID]'}
+• ট্রানজেকশন আইডি (TrxID): ${trxId.trim() || '[TrxID]'}${screenshotProofNoteBn}
 • প্রেরিত টাকা: ${settings.currencySymbol} ${finalPrice} BDT
 
 অনুগ্রহ করে আমার পেমেন্ট যাচাই করে ই-বুক ডাউনলোডের লিংক দিন। ধন্যবাদ!`;
@@ -103,13 +125,13 @@ export const WhatsAppCheckoutModal: React.FC = () => {
 *Format:* ${activeCheckoutBook.format}
 
 *Customer Details:*
-• Name: ${customerName.trim() || '[Customer Name]'}
-• WhatsApp: ${customerPhone.trim() || '[WhatsApp Phone]'}
+• Buyer Name: ${customerName.trim() || '[Customer Name]'}
+• Buyer WhatsApp: ${customerPhone.trim() || '[WhatsApp Phone]'}${giftSectionEn}
 
 *Payment Verification:*
 • Method: ${paymentMethod} (${getMethodNumber().type})
 • Sender Number: ${senderNumber.trim() || '[Sender Number]'}
-• Transaction ID (TrxID): ${trxId.trim() || '[TrxID]'}
+• Transaction ID (TrxID): ${trxId.trim() || '[TrxID]'}${screenshotProofNoteEn}
 • Amount Paid: ${settings.currencySymbol} ${finalPrice} BDT
 
 Please verify my payment and send me the e-book download link. Thank you!`;
@@ -119,7 +141,8 @@ Please verify my payment and send me the e-book download link. Thank you!`;
   const targetWhatsApp = settings.whatsappNumber.replace(/[^0-9]/g, '') || '8801700968369';
   const whatsappUrl = `https://wa.me/${targetWhatsApp}?text=${encodeURIComponent(fullMessage)}`;
 
-  const isFormValid = customerName.trim().length > 1 && trxId.trim().length > 3;
+  // Valid if has name AND (trxId OR hasScreenshotProof)
+  const isFormValid = customerName.trim().length > 1 && (trxId.trim().length >= 3 || hasScreenshotProof);
 
   const handleSendWhatsApp = () => {
     if (!isFormValid) return;
@@ -401,17 +424,123 @@ Please verify my payment and send me the e-book download link. Thank you!`;
               </div>
 
               <div>
-                <label className="text-xs text-slate-600 dark:text-slate-400 block mb-1">
-                  {t.trxId} <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-slate-600 dark:text-slate-400">
+                    {t.trxId} {!hasScreenshotProof && <span className="text-rose-500">*</span>}
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {language === 'bn' ? 'অথবা নিচে স্ক্রিনশট দিন' : 'or upload screenshot below'}
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={trxId}
                   onChange={(e) => setTrxId(e.target.value)}
-                  placeholder={t.trxIdPlaceholder}
+                  placeholder={hasScreenshotProof ? (language === 'bn' ? 'স্ক্রিনশট দিচ্ছেন (TrxID ঐচ্ছিক)' : 'Screenshot attached (TrxID optional)') : t.trxIdPlaceholder}
                   className="w-full px-3.5 py-3 text-sm font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[46px]"
                 />
               </div>
+            </div>
+
+            {/* Quick Proof: Payment Screenshot Option */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-4 h-4" />
+                </span>
+                <div className="min-w-0 text-xs">
+                  <span className="font-bold text-slate-900 dark:text-white block">
+                    {language === 'bn' ? 'পেমেন্ট স্ক্রিনশট প্রুফ (দ্রুত ভেরিফিকেশন)' : 'Payment Screenshot Proof'}
+                  </span>
+                  <span className="text-[11px] text-slate-500 truncate block">
+                    {screenshotFileName 
+                      ? `✅ ${screenshotFileName}` 
+                      : (language === 'bn' ? 'TrxID টাইপ করতে না চাইলে স্ক্রিনশট সিলেক্ট করুন' : 'Select screenshot if you prefer not typing TrxID')}
+                  </span>
+                </div>
+              </div>
+
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer shadow-xs shrink-0">
+                <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{screenshotFileName ? (language === 'bn' ? 'পরিবর্তন' : 'Change') : (language === 'bn' ? 'ফাইল বাছুন' : 'Attach')}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setScreenshotFileName(e.target.files[0].name);
+                      setHasScreenshotProof(true);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* GIFT AN E-BOOK TOGGLE */}
+            <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isGift}
+                    onChange={(e) => setIsGift(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Gift className="w-3.5 h-3.5 text-pink-500" />
+                    <span>{language === 'bn' ? 'কাউকে উপহার হিসেবে পাঠাতে চান? (Gift an E-Book)' : 'Gift this e-book to a friend?'}</span>
+                  </span>
+                </label>
+                {isGift && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 bg-pink-50 dark:bg-pink-950/60 px-2 py-0.5 rounded-full">
+                    {language === 'bn' ? 'উপহার চালু' : 'Gift Active'}
+                  </span>
+                )}
+              </div>
+
+              {isGift && (
+                <div className="p-3.5 rounded-2xl bg-pink-50/60 dark:bg-pink-950/20 border border-pink-200 dark:border-pink-900/50 space-y-3 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                        {language === 'bn' ? 'প্রাপকের নাম (বন্ধুর নাম)' : "Friend's Full Name"} *
+                      </label>
+                      <input
+                        type="text"
+                        value={giftRecipientName}
+                        onChange={(e) => setGiftRecipientName(e.target.value)}
+                        placeholder="e.g. Asif Iqbal"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                        {language === 'bn' ? 'প্রাপকের হোয়াটসঅ্যাপ নম্বর' : "Friend's WhatsApp Number"} *
+                      </label>
+                      <input
+                        type="text"
+                        value={giftRecipientPhone}
+                        onChange={(e) => setGiftRecipientPhone(e.target.value)}
+                        placeholder="+8801XXXXXXXXX"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1 text-xs">
+                      {language === 'bn' ? 'উপহারের সাথে শুভেচ্ছাবার্তা (ঐচ্ছিক)' : 'Personal Gift Message (Optional)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={giftMessage}
+                      onChange={(e) => setGiftMessage(e.target.value)}
+                      placeholder={language === 'bn' ? 'শুভ জন্মদিন! তোমার ক্যারিয়ারের জন্য শুভকামনা রইল।' : 'Happy Birthday! Best wishes for your learning.'}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

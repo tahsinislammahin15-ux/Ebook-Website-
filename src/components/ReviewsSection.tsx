@@ -1,67 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { CustomerReview } from '../types/ebook';
-import { Star, MessageSquareQuote, CheckCircle, Plus, Send } from 'lucide-react';
-
-const INITIAL_REVIEWS: CustomerReview[] = [
-  {
-    id: 'rev-1',
-    name: 'Hasibul Islam',
-    nameBn: 'হাসিবুল ইসলাম',
-    role: 'Junior Software Engineer',
-    roleBn: 'জুনিয়র সফটওয়্যার ইঞ্জিনিয়ার',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    rating: 5,
-    comment: 'Python & AI Mastery e-book helped me land my first tech internship. The Bengali explanations of complex concepts were exceptionally clear!',
-    commentBn: 'পাইথন ও এআই বইটি পড়ে আমি অনেক কিছু সহজভাবে শিখতে পেরেছি। বাংলা ভাষায় এত সুন্দর ও আধুনিক হ্যান্ডস-অন গাইড আসলেই বিরল!',
-    bookTitle: 'Python & AI Mastery',
-    bookTitleBn: 'পাইথন ও এআই মাস্টারি',
-    verified: true,
-    date: '3 days ago'
-  },
-  {
-    id: 'rev-2',
-    name: 'Tania Akter',
-    nameBn: 'তানিয়া আক্তার',
-    role: 'Fiverr & Upwork Top Freelancer',
-    roleBn: 'আপওয়ার্ক ও ফাইভার ফ্রিল্যান্সার',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-    rating: 5,
-    comment: 'Purchased Bangla Freelancing Playbook via bKash. Got the Google Drive link on WhatsApp within 4 minutes! Outstanding service.',
-    commentBn: 'বিকাশ দিয়ে অর্ডার করার মাত্র ৪ মিনিটের মধ্যেই হোয়াটসঅ্যাপে গুগল ড্রাইভের ফুল ডাউনলোড লিংক পেয়েছি। সার্ভিস অসাধারণ!',
-    bookTitle: 'Bangla Freelancing Playbook',
-    bookTitleBn: 'বাংলা ফ্রিল্যান্সিং প্লেবুক',
-    verified: true,
-    date: '1 week ago'
-  },
-  {
-    id: 'rev-3',
-    name: 'Mehedi Hasan Rifat',
-    nameBn: 'মেহেদী হাসান রিফাত',
-    role: 'Computer Science Student, RUET',
-    roleBn: 'সিএসই শিক্ষার্থী, রুয়েট',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    rating: 5,
-    comment: 'Downloaded the free Modern Web Architecture sample excerpt first. Loved the quality and immediately bought the complete version!',
-    commentBn: 'প্রথমে ওয়েবসাইটের রিডার দিয়ে ফ্রিতে নমুনা অংশ পড়েছিলাম। কোয়ালিটি দেখে মুগ্ধ হয়ে সাথে সাথেই পুরো বইটি অর্ডার করেছি।',
-    bookTitle: 'Modern Web Architecture',
-    bookTitleBn: 'মডার্ন ওয়েব আর্কিটেকচার',
-    verified: true,
-    date: '2 weeks ago'
-  }
-];
+import { Star, CheckCircle, Plus, Send } from 'lucide-react';
 
 export const ReviewsSection: React.FC = () => {
-  const { language } = useStore();
-  const [reviews, setReviews] = useState<CustomerReview[]>(() => {
-    try {
-      const saved = localStorage.getItem('kitabghor_customer_reviews');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return INITIAL_REVIEWS;
-  });
+  const { language, settings, reviews, addReview } = useStore();
 
   const [showAddReview, setShowAddReview] = useState(false);
   const [name, setName] = useState('');
@@ -70,6 +13,8 @@ export const ReviewsSection: React.FC = () => {
   const [comment, setComment] = useState('');
   const [rating, setRating] = useState(5);
   const [submittedNotice, setSubmittedNotice] = useState(false);
+
+  if (settings.showReviewsSection === false) return null;
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,9 +36,7 @@ export const ReviewsSection: React.FC = () => {
       date: language === 'bn' ? 'এইমাত্র' : 'Just now'
     };
 
-    const next = [newRev, ...reviews];
-    setReviews(next);
-    localStorage.setItem('kitabghor_customer_reviews', JSON.stringify(next));
+    addReview(newRev);
 
     setName('');
     setRole('');

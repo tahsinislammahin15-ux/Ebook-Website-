@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Ebook, StoreSettings, SiteLanguage, Coupon, ReadingProgress } from '../types/ebook';
+import { Ebook, StoreSettings, SiteLanguage, Coupon, ReadingProgress, CustomerReview } from '../types/ebook';
 import { DEFAULT_EBOOKS, DEFAULT_STORE_SETTINGS } from '../data/defaultProducts';
 import { TRANSLATIONS } from '../data/translations';
 
@@ -47,6 +47,9 @@ interface StoreContextType {
   lastReadBook: ReadingProgress | null;
   downloadGiftModalBook: Ebook | null;
   closeDownloadGiftModal: () => void;
+  reviews: CustomerReview[];
+  addReview: (rev: CustomerReview) => void;
+  deleteReview: (id: string) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -76,21 +79,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_SETTINGS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Force updated credentials requested by user
         return {
           ...DEFAULT_STORE_SETTINGS,
-          ...parsed,
-          storeName: "KitabGhar",
-          storeNameBn: "কিতাবঘর (KitabGhar)",
-          storeTagline: "Your Ultimate Book Home",
-          storeTaglineBn: "আপনার বইয়ের নির্ভরযোগ্য ঠিকানা (Your Ultimate Book Home)",
-          logoUrl: "/assets/aistudio/1794301559714_e54adc4f.jpg",
-          whatsappNumber: "8801700968369",
-          whatsappDisplayNumber: "+880 1700-968369",
-          bkashNumber: "01712-455726",
-          nagadNumber: "01700-968369",
-          adminUsername: "tahsinislam",
-          adminPasscode: "tahsinislam4567"
+          ...parsed
         };
       }
     } catch {
@@ -187,6 +178,82 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Download Gift Confetti & Bonus Coupon Modal
   const [downloadGiftModalBook, setDownloadGiftModalBook] = useState<Ebook | null>(null);
   const closeDownloadGiftModal = () => setDownloadGiftModalBook(null);
+
+  // Customer Reviews State
+  const LOCAL_STORAGE_KEY_REVIEWS = 'kitabghor_customer_reviews';
+  const INITIAL_REVIEWS: CustomerReview[] = [
+    {
+      id: 'rev-1',
+      name: 'Hasibul Islam',
+      nameBn: 'হাসিবুল ইসলাম',
+      role: 'Junior Software Engineer',
+      roleBn: 'জুনিয়র সফটওয়্যার ইঞ্জিনিয়ার',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      rating: 5,
+      comment: 'Python & AI Mastery e-book helped me land my first tech internship. The Bengali explanations of complex concepts were exceptionally clear!',
+      commentBn: 'পাইথন ও এআই বইটি পড়ে আমি অনেক কিছু সহজভাবে শিখতে পেরেছি। বাংলা ভাষায় এত সুন্দর ও আধুনিক হ্যান্ডস-অন গাইড আসলেই বিরল!',
+      bookTitle: 'Python & AI Mastery',
+      bookTitleBn: 'পাইথন ও এআই মাস্টারি',
+      verified: true,
+      date: '3 days ago'
+    },
+    {
+      id: 'rev-2',
+      name: 'Tania Akter',
+      nameBn: 'তানিয়া আক্তার',
+      role: 'Fiverr & Upwork Top Freelancer',
+      roleBn: 'আপওয়ার্ক ও ফাইভার ফ্রিল্যান্সার',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+      rating: 5,
+      comment: 'Purchased Bangla Freelancing Playbook via bKash. Got the Google Drive link on WhatsApp within 4 minutes! Outstanding service.',
+      commentBn: 'বিকাশ দিয়ে অর্ডার করার মাত্র ৪ মিনিটের মধ্যেই হোয়াটসঅ্যাপে গুগল ড্রাইভের ফুল ডাউনলোড লিংক পেয়েছি। সার্ভিস অসাধারণ!',
+      bookTitle: 'Bangla Freelancing Playbook',
+      bookTitleBn: 'বাংলা ফ্রিল্যান্সিং প্লেবুক',
+      verified: true,
+      date: '1 week ago'
+    },
+    {
+      id: 'rev-3',
+      name: 'Mehedi Hasan Rifat',
+      nameBn: 'মেহেদী হাসান রিফাত',
+      role: 'Computer Science Student, RUET',
+      roleBn: 'সিএসই শিক্ষার্থী, রুয়েট',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+      rating: 5,
+      comment: 'Downloaded the free Modern Web Architecture sample excerpt first. Loved the quality and immediately bought the complete version!',
+      commentBn: 'প্রথমে ওয়েবসাইটের রিডার দিয়ে ফ্রিতে নমুনা অংশ পড়েছিলাম। কোয়ালিটি দেখে মুগ্ধ হয়ে সাথে সাথেই পুরো বইটি অর্ডার করেছি।',
+      bookTitle: 'Modern Web Architecture',
+      bookTitleBn: 'মডার্ন ওয়েব আর্কিটেকচার',
+      verified: true,
+      date: '2 weeks ago'
+    }
+  ];
+
+  const [reviews, setReviews] = useState<CustomerReview[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_REVIEWS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return INITIAL_REVIEWS;
+  });
+
+  const addReview = (rev: CustomerReview) => {
+    setReviews(prev => {
+      const next = [rev, ...prev];
+      localStorage.setItem(LOCAL_STORAGE_KEY_REVIEWS, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const deleteReview = (id: string) => {
+    setReviews(prev => {
+      const next = prev.filter(r => r.id !== id);
+      localStorage.setItem(LOCAL_STORAGE_KEY_REVIEWS, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const openWishlist = () => setIsWishlistOpen(true);
   const closeWishlist = () => setIsWishlistOpen(false);
@@ -403,40 +470,142 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const excerpt = language === 'bn' && book.previewExcerptBn ? book.previewExcerptBn : book.previewExcerpt;
     const toc = language === 'bn' && book.tableOfContentsBn ? book.tableOfContentsBn : book.tableOfContents;
 
-    const content = `=====================================================
-${title.toUpperCase()}
-=====================================================
-${language === 'bn' ? 'লেখক' : 'Author'}: ${author}
-${language === 'bn' ? 'ক্যাটেগরি' : 'Category'}: ${book.category}
-${language === 'bn' ? 'পৃষ্ঠা সংখ্যা' : 'Pages'}: ${book.pages}
-${language === 'bn' ? 'ভাষা' : 'Language'}: ${book.language}
-${language === 'bn' ? 'ফরম্যাট' : 'Format'}: ${book.format}
-${language === 'bn' ? 'পরিবেশক' : 'Distributed by'}: ${language === 'bn' ? settings.storeNameBn : settings.storeName}
-=====================================================
+    const htmlDocument = `<!DOCTYPE html>
+<html lang="${language}">
+<head>
+  <meta charset="utf-8">
+  <title>${title} - ${settings.storeName}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @page { size: A4; margin: 20mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+      line-height: 1.7;
+      color: #1e293b;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      background: #ffffff;
+    }
+    .cover-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 36px;
+      background: #f8fafc;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #10b981;
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin: 8px 0; }
+    .author { font-size: 15px; color: #64748b; margin-bottom: 20px; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+      text-align: left;
+      font-size: 13px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+    }
+    .meta-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: bold; }
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #10b981;
+      padding-bottom: 6px;
+      margin-top: 32px;
+      margin-bottom: 16px;
+    }
+    .toc-list { list-style: none; padding: 0; }
+    .toc-list li {
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .excerpt-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #10b981;
+      border-radius: 8px;
+      padding: 24px;
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #334155;
+    }
+    .footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .print-btn {
+      display: block;
+      margin: 0 auto 24px auto;
+      padding: 10px 20px;
+      background: #10b981;
+      color: #ffffff;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    @media print { .print-btn { display: none; } }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">${language === 'bn' ? '🖨️ এই পেজটি সরাসরি PDF হিসেবে সেভ করুন' : '🖨️ Save as PDF / Print'}</button>
+  <div class="cover-card">
+    <span class="badge">${language === 'bn' ? 'ফ্রি ই-বুক সংস্করণ' : 'Free E-Book Edition'}</span>
+    <h1>${title}</h1>
+    <div class="author">${language === 'bn' ? 'লেখক:' : 'By'} ${author}</div>
+    <div class="meta-grid">
+      <div><div class="meta-label">${language === 'bn' ? 'ক্যাটেগরি' : 'Category'}</div><strong>${book.category}</strong></div>
+      <div><div class="meta-label">${language === 'bn' ? 'পৃষ্ঠা' : 'Pages'}</div><strong>${book.pages}</strong></div>
+      <div><div class="meta-label">${language === 'bn' ? 'ফরম্যাট' : 'Format'}</div><strong>PDF Reader Ready</strong></div>
+    </div>
+  </div>
 
-${language === 'bn' ? 'বই পরিচিতি:' : 'DESCRIPTION:'}
-${desc}
+  <div class="section-title">${language === 'bn' ? 'বই পরিচিতি' : 'About This Book'}</div>
+  <p>${desc}</p>
 
-${language === 'bn' ? 'সূচিপত্র:' : 'TABLE OF CONTENTS:'}
-${toc.map((item, idx) => `  ${idx + 1}. ${item}`).join('\n')}
+  <div class="section-title">${language === 'bn' ? 'সূচিপত্র' : 'Table of Contents'}</div>
+  <ul class="toc-list">
+    ${toc.map((c, i) => `<li>${i + 1}. ${c}</li>`).join('')}
+  </ul>
 
-=====================================================
-${language === 'bn' ? 'নমুনা পাঠ ও নির্বাচিত অধ্যায়:' : 'EXCERPT & PREVIEW:'}
-=====================================================
+  <div class="section-title">${language === 'bn' ? 'নমুনা পাঠ ও নির্বাচিত অধ্যায়' : 'Selected Sample Chapters'}</div>
+  <div class="excerpt-box">${excerpt}</div>
 
-${excerpt}
+  <div class="footer">
+    <p><strong>${language === 'bn' ? settings.storeNameBn : settings.storeName}</strong> - ${language === 'bn' ? settings.storeTaglineBn : settings.storeTagline}</p>
+    <p>WhatsApp Support: ${settings.whatsappDisplayNumber}</p>
+  </div>
+</body>
+</html>`;
 
-=====================================================
-${language === 'bn' 
-  ? `বইটি ডাউনলোড করার জন্য ধন্যবাদ!\nহোয়াটসঅ্যাপ হেল্পলাইন: ${settings.whatsappDisplayNumber}`
-  : `Thank you for downloading from ${settings.storeName}!\nWhatsApp Support: ${settings.whatsappDisplayNumber}`}
-=====================================================
-`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([htmlDocument], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_')}_KitabGhor.txt`;
+    a.download = `${title.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_')}_KitabGhar.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -491,7 +660,10 @@ ${language === 'bn'
         updateReadingProgress,
         lastReadBook,
         downloadGiftModalBook,
-        closeDownloadGiftModal
+        closeDownloadGiftModal,
+        reviews,
+        addReview,
+        deleteReview
       }}
     >
       {children}

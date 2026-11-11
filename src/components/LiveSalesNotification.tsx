@@ -91,13 +91,16 @@ const RECENT_SALES: PurchaseEvent[] = [
 ];
 
 export const LiveSalesNotification: React.FC = () => {
-  const { language, ebooks, openCheckout } = useStore();
+  const { language, ebooks, openCheckout, settings } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  const salesList = settings.liveSales && settings.liveSales.length > 0 ? settings.liveSales : RECENT_SALES;
+  const popupEnabled = settings.showLiveSalesPopup !== false;
+
   useEffect(() => {
-    if (isDismissed) return;
+    if (isDismissed || !popupEnabled || salesList.length === 0) return;
 
     // Initial popup display after 4 seconds
     const initialTimer = setTimeout(() => {
@@ -109,7 +112,7 @@ export const LiveSalesNotification: React.FC = () => {
       setIsVisible(false);
       setTimeout(() => {
         if (!isDismissed) {
-          setCurrentIndex(prev => (prev + 1) % RECENT_SALES.length);
+          setCurrentIndex(prev => (prev + 1) % salesList.length);
           setIsVisible(true);
         }
       }, 1000);
@@ -119,7 +122,7 @@ export const LiveSalesNotification: React.FC = () => {
       clearTimeout(initialTimer);
       clearInterval(cycleInterval);
     };
-  }, [isDismissed]);
+  }, [isDismissed, popupEnabled, salesList.length]);
 
   // Auto-hide each single toast after 6.5s
   useEffect(() => {
@@ -130,13 +133,13 @@ export const LiveSalesNotification: React.FC = () => {
     return () => clearTimeout(hideTimer);
   }, [isVisible]);
 
-  if (isDismissed) return null;
+  if (isDismissed || !popupEnabled || salesList.length === 0) return null;
 
-  const current = RECENT_SALES[currentIndex];
-  const buyerName = language === 'bn' ? current.buyerNameBn : current.buyerName;
-  const district = language === 'bn' ? current.districtBn : current.district;
-  const bookTitle = language === 'bn' ? current.bookTitleBn : current.bookTitle;
-  const timeAgo = language === 'bn' ? current.timeAgoBn : current.timeAgo;
+  const current = salesList[currentIndex % salesList.length];
+  const buyerName = language === 'bn' ? (current.buyerNameBn || current.buyerName) : current.buyerName;
+  const district = language === 'bn' ? (current.districtBn || current.district) : current.district;
+  const bookTitle = language === 'bn' ? (current.bookTitleBn || current.bookTitle) : current.bookTitle;
+  const timeAgo = language === 'bn' ? (current.timeAgoBn || current.timeAgo) : current.timeAgo;
 
   const handleClickBook = () => {
     if (current.bookId) {

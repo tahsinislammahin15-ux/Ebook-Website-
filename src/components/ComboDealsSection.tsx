@@ -35,6 +35,11 @@ const COMBO_BUNDLES: ComboBundle[] = [
 export const ComboDealsSection: React.FC = () => {
   const { language, settings, ebooks, openCheckout } = useStore();
 
+  if (settings.showBundlesSection === false) return null;
+
+  const activeBundles = settings.bundles && settings.bundles.length > 0 ? settings.bundles : COMBO_BUNDLES;
+  if (activeBundles.length === 0) return null;
+
   const handleOrderBundle = (bundle: ComboBundle) => {
     // Construct a synthetic bundle book item for checkout
     const bundleBook = {
@@ -93,7 +98,7 @@ export const ComboDealsSection: React.FC = () => {
 
         {/* Bundle Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {COMBO_BUNDLES.map((bundle) => {
+          {activeBundles.map((bundle) => {
             const name = language === 'bn' ? bundle.nameBn : bundle.name;
             const tagline = language === 'bn' ? bundle.taglineBn : bundle.tagline;
             const badge = language === 'bn' ? bundle.badgeBn : bundle.badge;

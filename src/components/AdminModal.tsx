@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Ebook, SEOSettings } from '../types/ebook';
+import { Ebook, SEOSettings, ComboBundle, FAQEntry, LiveSaleItem } from '../types/ebook';
 import { DEFAULT_STORE_SETTINGS } from '../data/defaultProducts';
 import { 
   X, Shield, Lock, Plus, Edit2, Trash2, Download, Save, 
   RotateCcw, Check, AlertCircle, FileCode, Smartphone, BookOpen, Layers,
-  LogOut, Eye, EyeOff, User, KeyRound, Clock, Globe, Share2, Sparkles, Copy, ExternalLink, CheckCheck, Tag
+  LogOut, Eye, EyeOff, User, KeyRound, Clock, Globe, Share2, Sparkles, Copy, CheckCheck, Tag,
+  Sliders, HelpCircle, Star, ShoppingBag, Gift, UserCheck
 } from 'lucide-react';
 
 const LOCKOUT_KEY = 'kitabghor_admin_lockout';
@@ -19,7 +20,8 @@ export const AdminModal: React.FC = () => {
     isAdminOpen, closeAdmin, ebooks, settings, 
     addEbook, updateEbook, deleteEbook, updateSettings, 
     exportProductsJSON, resetCatalog, language,
-    coupons, addCoupon, deleteCoupon, toggleCoupon 
+    coupons, addCoupon, deleteCoupon, toggleCoupon,
+    reviews, addReview, deleteReview
   } = useStore();
 
   const [usernameInput, setUsernameInput] = useState('');
@@ -47,7 +49,7 @@ export const AdminModal: React.FC = () => {
     }
   });
 
-  const [activeTab, setActiveTab] = useState<'books' | 'settings' | 'cpanel' | 'seo' | 'coupons'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'sections' | 'bundles_faq' | 'coupons' | 'settings' | 'seo' | 'cpanel'>('books');
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
@@ -111,6 +113,34 @@ export const AdminModal: React.FC = () => {
   const [newMinSpend, setNewMinSpend] = useState<number>(0);
   const [newCouponDesc, setNewCouponDesc] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // New Bundle form state
+  const [bundleNameBn, setBundleNameBn] = useState('');
+  const [bundleNameEn, setBundleNameEn] = useState('');
+  const [bundleTaglineBn, setBundleTaglineBn] = useState('');
+  const [bundlePrice, setBundlePrice] = useState<number>(450);
+  const [bundleOrigPrice, setBundleOrigPrice] = useState<number>(700);
+  const [bundleBadgeBn, setBundleBadgeBn] = useState('স্পেশাল কম্বো অফার');
+  const [selectedBundleBooks, setSelectedBundleBooks] = useState<string[]>([]);
+
+  // New FAQ form state
+  const [faqQBn, setFaqQBn] = useState('');
+  const [faqQEn, setFaqQEn] = useState('');
+  const [faqABn, setFaqABn] = useState('');
+  const [faqAEn, setFaqAEn] = useState('');
+
+  // New Live Sale form state
+  const [saleBuyerBn, setSaleBuyerBn] = useState('');
+  const [saleDistrictBn, setSaleDistrictBn] = useState('');
+  const [saleBookBn, setSaleBookBn] = useState('');
+  const [saleTimeBn, setSaleTimeBn] = useState('৫ মিনিট আগে');
+
+  // New Admin Review form state
+  const [revNameBn, setRevNameBn] = useState('');
+  const [revRoleBn, setRevRoleBn] = useState('যাচাইকৃত পাঠক');
+  const [revBookBn, setRevBookBn] = useState('পাইথন ও এআই মাস্টারি');
+  const [revCommentBn, setRevCommentBn] = useState('');
+  const [revRating, setRevRating] = useState<number>(5);
 
   useEffect(() => {
     setSettingsForm(settings);
@@ -538,7 +568,40 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                   }`}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? `ই-বুক তালিকা (${ebooks.length})` : `E-Books (${ebooks.length})`}</span>
+                  <span>{language === 'bn' ? `ই-বুক (${ebooks.length})` : `E-Books (${ebooks.length})`}</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('sections')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'sections'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'সাইট কন্ট্রোল ও সেকশন' : 'Site Control & Sections'}</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('bundles_faq')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'bundles_faq'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'বান্ডেল, FAQ ও রিভিউ' : 'Bundles, FAQ & Reviews'}</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('coupons')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'coupons'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? `কুপন (${coupons.length})` : `Coupons (${coupons.length})`}</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
@@ -549,18 +612,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                   }`}
                 >
                   <Smartphone className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? 'হোয়াটসঅ্যাপ ও বিকাশ নম্বর' : 'WhatsApp & Wallets'}</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('cpanel')}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-                    activeTab === 'cpanel'
-                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? 'সিপ্যানেল গাইড ও এক্সপোর্ট' : 'cPanel Guide & Export'}</span>
+                  <span>{language === 'bn' ? 'ওয়ালেট ও ব্র্যান্ড' : 'Wallets & Brand'}</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('seo')}
@@ -574,15 +626,15 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                   <span>{language === 'bn' ? 'এসইও ও মেটা' : 'SEO & Social'}</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('coupons')}
+                  onClick={() => setActiveTab('cpanel')}
                   className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-                    activeTab === 'coupons'
-                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    activeTab === 'cpanel'
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                   }`}
                 >
-                  <Tag className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? `কুপন ও অফার (${coupons.length})` : `Coupons (${coupons.length})`}</span>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'সিপ্যানেল এক্সপোর্ট' : 'cPanel Export'}</span>
                 </button>
               </div>
 
@@ -930,6 +982,37 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.storeNameBn}
                           onChange={(e) => setSettingsForm({ ...settingsForm, storeNameBn: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">Store Tagline (English)</label>
+                        <input
+                          type="text"
+                          value={settingsForm.storeTagline}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, storeTagline: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">স্টোর ট্যাগলাইন (বাংলা)</label>
+                        <input
+                          type="text"
+                          value={settingsForm.storeTaglineBn}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, storeTaglineBn: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">Brand Logo URL / Path</label>
+                        <input
+                          type="text"
+                          value={settingsForm.logoUrl || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, logoUrl: e.target.value })}
+                          placeholder="/assets/aistudio/1794301559714_e54adc4f.jpg"
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
@@ -1800,6 +1883,938 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* TAB 6: SITE SECTIONS, FLASH SALE & AUTHOR STORY CONTROL */}
+              {activeTab === 'sections' && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    updateSettings(settingsForm);
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 2500);
+                  }}
+                  className="space-y-8 text-xs"
+                >
+                  {/* 1. Master Section Visibility Toggles */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2.5 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Sliders className="w-4 h-4 text-emerald-600" />
+                          <span>{language === 'bn' ? '১. ওয়েবসাইটের সকল সেকশন অন/অফ সুইচ (Master Visibility)' : '1. Master Section Visibility Switches'}</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {language === 'bn'
+                            ? 'যেকোনো সেকশন ১-ক্লিকে চালু বা বন্ধ করুন এবং নিচে "সেভ করুন" চাপুন।'
+                            : 'Toggle any homepage section or popup on or off with 1 click.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* Toggle 1: Flash Sale Banner */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'ফ্ল্যাশ সেল কাউন্টডাউন ব্যানার' : 'Flash Sale Top Banner'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">Top countdown bar</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.flashSale?.enabled !== false}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                enabled: e.target.checked
+                              }
+                            })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Toggle 2: Combo Bundles Section */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'কম্বো বান্ডেল অফার সেকশন' : 'Combo Bundles Section'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">Multi-book discount packs</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.showBundlesSection !== false}
+                          onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, showBundlesSection: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Toggle 3: Customer Reviews Section */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'পাঠকদের রিভিউ ও রেটিং সেকশন' : 'Customer Reviews Section'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">5-star reader testimonials</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.showReviewsSection !== false}
+                          onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, showReviewsSection: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Toggle 4: Author & Founder Trust Story */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'লেখক ও প্রতিষ্ঠাতার গল্প' : 'Author & Founder Story'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">KitabGhar mission & trust</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.authorStory?.enabled !== false}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                enabled: e.target.checked
+                              }
+                            })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Toggle 5: FAQ Section */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'সাধারণ প্রশ্নোত্তর (FAQ)' : 'FAQ Accordion Section'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">Questions & answers</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.showFaqSection !== false}
+                          onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, showFaqSection: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Toggle 6: Live Sales Popup */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'লাইভ সেলস পপআপ নোটিফিকেশন' : 'Live Sales Social Proof Popup'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">Bottom-left buyer toast</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.showLiveSalesPopup !== false}
+                          onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, showLiveSalesPopup: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 2. Flash Sale Banner & Free Download Gift Coupon Settings */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Gift className="w-4 h-4 text-amber-500" />
+                        <span>{language === 'bn' ? '২. ফ্ল্যাশ সেল ব্যানার ও ফ্রি ডাউনলোড গিফট কুপন কন্ট্রোল' : '2. Flash Sale Banner & Download Gift Coupon'}</span>
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্ল্যাশ সেল ব্যাজ (বাংলা)' : 'Flash Sale Badge (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.flashSale?.badgeBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                badgeBn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্ল্যাশ সেল ব্যাজ (English)' : 'Flash Sale Badge (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.flashSale?.badgeEn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                badgeEn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্ল্যাশ সেল অফার টেক্সট (বাংলা)' : 'Flash Sale Offer Text (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.flashSale?.textBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                textBn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্ল্যাশ সেল অফার টেক্সট (English)' : 'Flash Sale Offer Text (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.flashSale?.textEn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                textEn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্ল্যাশ সেল প্রোমো কোড' : 'Flash Sale Promo Code'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.flashSale?.promoCode || 'KITAB20'}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              flashSale: {
+                                ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
+                                promoCode: e.target.value.toUpperCase()
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-amber-400 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold uppercase"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'ফ্রি বই ডাউনলোড বোনাস গিফট কোড' : 'Free Download Thank-You Gift Coupon'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.downloadGiftCouponCode || 'FIRST20'}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              downloadGiftCouponCode: e.target.value.toUpperCase()
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-emerald-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold uppercase"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Author & Founder Trust Story Editor */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? '৩. লেখক পরিচিতি ও কিতাবঘর ট্রাস্ট স্টোরি এডিটর' : '3. Author & Founder Trust Story Editor'}</span>
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'প্রতিষ্ঠাতা / লেখকের নাম (বাংলা)' : 'Founder Name (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.authorStory?.founderNameBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                founderNameBn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'প্রতিষ্ঠাতা / লেখকের নাম (English)' : 'Founder Name (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.authorStory?.founderName || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                founderName: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'পদবী / পরিচয় (বাংলা)' : 'Founder Role (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.authorStory?.founderRoleBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                founderRoleBn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'পদবী / পরিচয় (English)' : 'Founder Role (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.authorStory?.founderRole || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                founderRole: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'স্টোরি হেডলাইন (বাংলা)' : 'Story Headline (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.authorStory?.headlineBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                headlineBn: e.target.value,
+                                headline: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'লেখক ও কিতাবঘরের বিস্তারিত গল্প (বাংলা)' : 'Founder Bio & Mission Story (Bangla)'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={settingsForm.authorStory?.bioBn || ''}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              authorStory: {
+                                ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
+                                bioBn: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{language === 'bn' ? 'সকল সেকশন পরিবর্তন সেভ করুন' : 'Save All Section Controls'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB 7: BUNDLES, FAQ, REVIEWS & LIVE SOCIAL PROOF MANAGER */}
+              {activeTab === 'bundles_faq' && (
+                <div className="space-y-8 text-xs">
+                  
+                  {/* 1. COMBO BUNDLES MANAGER */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-emerald-600" />
+                          <span>{language === 'bn' ? '১. কম্বো বান্ডেল অফার ম্যানেজার' : '1. Combo Bundles Manager'}</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {language === 'bn' ? 'একাধিক বই একত্রে বিশেষ ছাড়ে বিক্রি করার জন্য কম্বো বান্ডেল তৈরি বা ডিলিট করুন।' : 'Create or remove multi-book discount bundles.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Add New Bundle Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!bundleNameBn.trim()) return;
+                        const currentBundles = settings.bundles || DEFAULT_STORE_SETTINGS.bundles || [];
+                        const orig = Number(bundleOrigPrice) || 700;
+                        const price = Number(bundlePrice) || 450;
+                        const newBundle: ComboBundle = {
+                          id: `bundle-${Date.now()}`,
+                          name: bundleNameEn.trim() || bundleNameBn.trim(),
+                          nameBn: bundleNameBn.trim(),
+                          tagline: bundleTaglineBn.trim() || 'Complete mastery bundle',
+                          taglineBn: bundleTaglineBn.trim() || 'একসাথে কিনলে বিশেষ ছাড়!',
+                          bookIds: selectedBundleBooks.length > 0 ? selectedBundleBooks : ebooks.slice(0, 2).map(b => b.id),
+                          originalPrice: orig,
+                          bundlePrice: price,
+                          savings: Math.max(0, orig - price),
+                          badge: bundleBadgeBn.trim() || 'Combo Deal',
+                          badgeBn: bundleBadgeBn.trim() || 'স্পেশাল কম্বো'
+                        };
+                        updateSettings({ bundles: [newBundle, ...currentBundles] });
+                        setBundleNameBn('');
+                        setBundleNameEn('');
+                        setBundleTaglineBn('');
+                        setSelectedBundleBooks([]);
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 2500);
+                      }}
+                      className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
+                    >
+                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'নতুন কম্বো বান্ডেল যোগ করুন' : 'Create New Combo Bundle'}
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          required
+                          value={bundleNameBn}
+                          onChange={(e) => setBundleNameBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'বান্ডেলের নাম (বাংলা) *' : 'Bundle Name (Bangla) *'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={bundleTaglineBn}
+                          onChange={(e) => setBundleTaglineBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'সংক্ষিপ্ত বিবরণ (বাংলা)' : 'Short Tagline'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={bundleBadgeBn}
+                          onChange={(e) => setBundleBadgeBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'ব্যাজ (যেমন: ২৫০ টাকা সাশ্রয়)' : 'Badge Text'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-500 block mb-1">
+                            {language === 'bn' ? 'রেগুলার মূল্য (৳)' : 'Original Total Price (BDT)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={bundleOrigPrice}
+                            onChange={(e) => setBundleOrigPrice(Number(e.target.value))}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-emerald-600 block mb-1">
+                            {language === 'bn' ? 'বান্ডেল অফার মূল্য (৳) *' : 'Discounted Bundle Price (BDT) *'}
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            value={bundlePrice}
+                            onChange={(e) => setBundlePrice(Number(e.target.value))}
+                            className="w-full px-3 py-2 rounded-lg border border-emerald-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Select Books Checkboxes */}
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">
+                          {language === 'bn' ? 'বান্ডেলে অন্তর্ভুক্ত বইগুলো সিলেক্ট করুন:' : 'Select E-Books to Include:'}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {ebooks.map(b => {
+                            const checked = selectedBundleBooks.includes(b.id);
+                            return (
+                              <label
+                                key={b.id}
+                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-medium cursor-pointer flex items-center gap-1.5 ${
+                                  checked
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold'
+                                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedBundleBooks(prev => [...prev, b.id]);
+                                    } else {
+                                      setSelectedBundleBooks(prev => prev.filter(id => id !== b.id));
+                                    }
+                                  }}
+                                  className="accent-emerald-600"
+                                />
+                                <span>{language === 'bn' && b.titleBn ? b.titleBn : b.title}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'বান্ডেল যোগ করুন' : 'Add Combo Bundle'}</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Existing Bundles List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(settings.bundles || DEFAULT_STORE_SETTINGS.bundles || []).map(b => (
+                        <div
+                          key={b.id}
+                          className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-bold text-amber-600 uppercase block">{b.badgeBn || b.badge}</span>
+                            <h5 className="font-bold text-slate-900 dark:text-white truncate">{b.nameBn || b.name}</h5>
+                            <p className="text-[11px] text-emerald-600 font-bold">
+                              ৳{b.bundlePrice} <span className="line-through text-slate-400 font-normal">৳{b.originalPrice}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = settings.bundles || DEFAULT_STORE_SETTINGS.bundles || [];
+                              updateSettings({ bundles: current.filter(item => item.id !== b.id) });
+                            }}
+                            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
+                            title="Delete Bundle"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. FAQ ACCORDION MANAGER */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? '২. সাধারণ প্রশ্নোত্তর (FAQ) ম্যানেজার' : '2. FAQ Questions & Answers Manager'}</span>
+                      </h4>
+                    </div>
+
+                    {/* Add FAQ Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!faqQBn.trim() || !faqABn.trim()) return;
+                        const currentFaqs = settings.faqs || DEFAULT_STORE_SETTINGS.faqs || [];
+                        const newFaq: FAQEntry = {
+                          id: `faq-${Date.now()}`,
+                          questionBn: faqQBn.trim(),
+                          question: faqQEn.trim() || faqQBn.trim(),
+                          answerBn: faqABn.trim(),
+                          answer: faqAEn.trim() || faqABn.trim()
+                        };
+                        updateSettings({ faqs: [...currentFaqs, newFaq] });
+                        setFaqQBn('');
+                        setFaqQEn('');
+                        setFaqABn('');
+                        setFaqAEn('');
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 2500);
+                      }}
+                      className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
+                    >
+                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'নতুন প্রশ্নোত্তর যোগ করুন' : 'Add New FAQ Item'}
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          required
+                          value={faqQBn}
+                          onChange={(e) => setFaqQBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'প্রশ্ন (বাংলা) *' : 'Question (Bangla) *'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={faqQEn}
+                          onChange={(e) => setFaqQEn(e.target.value)}
+                          placeholder={language === 'bn' ? 'প্রশ্ন (English - ঐচ্ছিক)' : 'Question (English - Optional)'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <textarea
+                        rows={2}
+                        required
+                        value={faqABn}
+                        onChange={(e) => setFaqABn(e.target.value)}
+                        placeholder={language === 'bn' ? 'উত্তর (বাংলা) *' : 'Answer (Bangla) *'}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'প্রশ্নোত্তর যোগ করুন' : 'Add FAQ'}</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Existing FAQs List */}
+                    <div className="space-y-2">
+                      {(settings.faqs || DEFAULT_STORE_SETTINGS.faqs || []).map((f) => (
+                        <div
+                          key={f.id}
+                          className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <h6 className="font-bold text-slate-900 dark:text-white">{f.questionBn || f.question}</h6>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{f.answerBn || f.answer}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = settings.faqs || DEFAULT_STORE_SETTINGS.faqs || [];
+                              updateSettings({ faqs: current.filter(item => item.id !== f.id) });
+                            }}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
+                            title="Delete FAQ"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. CUSTOMER REVIEWS MODERATION */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                        <span>{language === 'bn' ? `৩. পাঠকদের রিভিউ ও ৫-স্টার রেটিং নিয়ন্ত্রণ (${reviews.length})` : `3. Customer Reviews Moderation (${reviews.length})`}</span>
+                      </h4>
+                    </div>
+
+                    {/* Add Verified Review Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!revNameBn.trim() || !revCommentBn.trim()) return;
+                        addReview({
+                          id: `rev-${Date.now()}`,
+                          name: revNameBn.trim(),
+                          nameBn: revNameBn.trim(),
+                          role: revRoleBn.trim() || 'Verified Reader',
+                          roleBn: revRoleBn.trim() || 'যাচাইকৃত পাঠক',
+                          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                          rating: revRating,
+                          comment: revCommentBn.trim(),
+                          commentBn: revCommentBn.trim(),
+                          bookTitle: revBookBn,
+                          bookTitleBn: revBookBn,
+                          verified: true,
+                          date: 'যাচাইকৃত'
+                        });
+                        setRevNameBn('');
+                        setRevCommentBn('');
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 2500);
+                      }}
+                      className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
+                    >
+                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'নতুন ভেরিফাইড রিভিউ যোগ করুন' : 'Add Verified Customer Review'}
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          required
+                          value={revNameBn}
+                          onChange={(e) => setRevNameBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'পাঠকের নাম *' : 'Reader Name *'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={revRoleBn}
+                          onChange={(e) => setRevRoleBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'পেশা / পরিচয়' : 'Role / Profession'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={revBookBn}
+                          onChange={(e) => setRevBookBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'বইয়ের নাম' : 'Book Title'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <textarea
+                        rows={2}
+                        required
+                        value={revCommentBn}
+                        onChange={(e) => setRevCommentBn(e.target.value)}
+                        placeholder={language === 'bn' ? 'রিভিউ মন্তব্য লিখুন *' : 'Review Comment *'}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500 mr-1">Rating:</span>
+                          {[1, 2, 3, 4, 5].map(st => (
+                            <button
+                              type="button"
+                              key={st}
+                              onClick={() => setRevRating(st)}
+                              className="p-0.5"
+                            >
+                              <Star className={`w-4 h-4 ${st <= revRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'রিভিউ যোগ করুন' : 'Publish Review'}</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Existing Reviews List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {reviews.map(r => (
+                        <div
+                          key={r.id}
+                          className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 dark:text-white">{r.nameBn || r.name}</span>
+                              <span className="text-[10px] text-amber-500 font-bold">★ {r.rating}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">&quot;{r.commentBn || r.comment}&quot;</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteReview(r.id)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
+                            title="Delete Review"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. LIVE SALES POPUP NOTIFICATIONS MANAGER */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? '৪. লাইভ সেলস সোশ্যাল প্রুফ পপআপ ম্যানেজার' : '4. Live Sales Notification Popup Items'}</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        {language === 'bn'
+                          ? 'স্ক্রিনের নিচে কোণায় "হাসিব এইমাত্র বইটি কিনলেন" নোটিফিকেশনে কাদের নাম ও জেলা দেখাবে তা নিয়ন্ত্রণ করুন।'
+                          : 'Customize the buyer notifications that cycle in the bottom-left corner.'}
+                      </p>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!saleBuyerBn.trim() || !saleBookBn.trim()) return;
+                        const currentSales = settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || [];
+                        const newSale: LiveSaleItem = {
+                          id: `sale-${Date.now()}`,
+                          buyerName: saleBuyerBn.trim(),
+                          buyerNameBn: saleBuyerBn.trim(),
+                          district: saleDistrictBn.trim() || 'Dhaka',
+                          districtBn: saleDistrictBn.trim() || 'ঢাকা',
+                          bookTitle: saleBookBn.trim(),
+                          bookTitleBn: saleBookBn.trim(),
+                          timeAgo: saleTimeBn.trim() || '5 mins ago',
+                          timeAgoBn: saleTimeBn.trim() || '৫ মিনিট আগে'
+                        };
+                        updateSettings({ liveSales: [newSale, ...currentSales] });
+                        setSaleBuyerBn('');
+                        setSaleDistrictBn('');
+                        setSaleBookBn('');
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 2500);
+                      }}
+                      className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                        <input
+                          type="text"
+                          required
+                          value={saleBuyerBn}
+                          onChange={(e) => setSaleBuyerBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'ক্রেতার নাম (যেমন: রাকিব হাসান) *' : 'Buyer Name *'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={saleDistrictBn}
+                          onChange={(e) => setSaleDistrictBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'এলাকা/জেলা (যেমন: ধানমন্ডি, ঢাকা)' : 'Location / District'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          required
+                          value={saleBookBn}
+                          onChange={(e) => setSaleBookBn(e.target.value)}
+                          placeholder={language === 'bn' ? 'কেনা বইয়ের নাম *' : 'Purchased Book Title *'}
+                          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'পপআপ যোগ করুন' : 'Add Notification'}</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Existing Live Sales List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {(settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || []).map(item => (
+                        <div
+                          key={item.id}
+                          className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 dark:text-white block truncate">
+                              {item.buyerNameBn || item.buyerName} ({item.districtBn || item.district})
+                            </span>
+                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block truncate">
+                              {item.bookTitleBn || item.bookTitle}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || [];
+                              updateSettings({ liveSales: current.filter(s => s.id !== item.id) });
+                            }}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
+                            title="Remove Notification"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
               )}
 

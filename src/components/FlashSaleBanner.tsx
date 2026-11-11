@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Flame, Clock, Sparkles, ArrowRight, Tag } from 'lucide-react';
+import { Flame, Clock, Sparkles, ArrowRight, Tag, X } from 'lucide-react';
 
 export const FlashSaleBanner: React.FC = () => {
   const { language, settings, openCheckout, ebooks } = useStore();
+  const [isDismissed, setIsDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('kitabghor_dismiss_flash_banner') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // 12-hour cyclical countdown for real urgency
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({
@@ -25,7 +32,7 @@ export const FlashSaleBanner: React.FC = () => {
       }
       const diff = Math.max(0, target.getTime() - now.getTime());
       const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / 1000 / 60);
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
       return { hours, minutes, seconds };
     };
@@ -38,33 +45,50 @@ export const FlashSaleBanner: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const flashConfig = settings.flashSale || {
+    enabled: true,
+    badgeBn: 'আজকের ফ্ল্যাশ সেল',
+    badgeEn: 'Today Flash Deal',
+    textBn: 'স্পেশাল কুপন কোড দিয়ে যেকোনো পেইড বইয়ে ২০% স্পেশাল ছাড়!',
+    textEn: 'Use promo code for Flat 20% Instant Discount on any paid book!',
+    promoCode: 'KITAB20'
+  };
+
+  if (isDismissed || flashConfig.enabled === false) return null;
+
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    try {
+      sessionStorage.setItem('kitabghor_dismiss_flash_banner', 'true');
+    } catch {
+      // fallback
+    }
+  };
+
   const format2Digits = (n: number) => n.toString().padStart(2, '0');
 
   // Find a popular paid book for quick order
   const featuredPaidBook = ebooks.find(b => b.type === 'paid') || ebooks[0];
 
   return (
-    <div className="w-full bg-gradient-to-r from-amber-600 via-rose-600 to-pink-600 text-white shadow-md relative overflow-hidden">
+    <div className="w-full bg-gradient-to-r from-amber-600 via-rose-600 to-pink-600 text-white shadow-xs relative overflow-hidden text-xs">
       {/* Background flare */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/15 via-transparent to-transparent pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-4 relative z-10 text-center md:text-left">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-3 relative z-10">
         
         {/* Left Side: Deal Badge & Headline */}
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-3">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-200 border border-white/20 shadow-xs animate-pulse">
             <Flame className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-            <span>{language === 'bn' ? 'আজকের ফ্ল্যাশ সেল' : 'Today Flash Deal'}</span>
+            <span>{language === 'bn' ? flashConfig.badgeBn : flashConfig.badgeEn}</span>
           </span>
 
-          <p className="text-xs sm:text-sm font-bold text-white">
-            {language === 'bn' ? (
-              <span>
-                স্পেশাল কুপন কোড <span className="underline decoration-amber-300 decoration-2 font-mono bg-black/20 px-1.5 py-0.5 rounded">KITAB20</span> দিয়ে যেকোনো পেইড বইয়ে <strong>২০% স্পেশাল ছাড়!</strong>
-              </span>
-            ) : (
-              <span>
-                Use coupon <span className="underline decoration-amber-300 decoration-2 font-mono bg-black/20 px-1.5 py-0.5 rounded">KITAB20</span> for <strong>Flat 20% Instant Discount!</strong>
+          <p className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 flex-wrap">
+            <span>{language === 'bn' ? flashConfig.textBn : flashConfig.textEn}</span>
+            {flashConfig.promoCode && (
+              <span className="underline decoration-amber-300 decoration-2 font-mono bg-black/25 px-2 py-0.5 rounded font-black text-amber-200">
+                {flashConfig.promoCode}
               </span>
             )}
           </p>
@@ -98,13 +122,23 @@ export const FlashSaleBanner: React.FC = () => {
           {featuredPaidBook && (
             <button
               onClick={() => openCheckout(featuredPaidBook)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white text-rose-700 hover:bg-amber-50 font-extrabold text-xs shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white text-rose-700 hover:bg-amber-50 font-black text-xs shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <Sparkles className="w-3 h-3 text-amber-500" />
               <span>{language === 'bn' ? 'অর্ডার করুন' : 'Claim Offer'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3 h-3" />
             </button>
           )}
+
+          {/* Dismiss button */}
+          <button
+            onClick={handleDismiss}
+            aria-label="Dismiss banner"
+            className="p-1 rounded-md text-white/70 hover:text-white hover:bg-black/20 transition-colors shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
 
         </div>
 

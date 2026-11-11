@@ -34,14 +34,29 @@ export const ReadingResumeBanner: React.FC = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => openReader(targetBook)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 shadow-xs active:scale-95 transition-all cursor-pointer"
-        >
-          <span>{language === 'bn' ? 'পড়া শুরু করুন' : 'Resume'}</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => openReader(targetBook)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 shadow-xs active:scale-95 transition-all cursor-pointer"
+          >
+            <span>{language === 'bn' ? 'পড়া শুরু করুন' : 'Resume'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              // Clear lastReadBook by removing progress
+              localStorage.removeItem('kitabghor_reading_progress');
+              window.location.reload();
+            }}
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+            title="Dismiss progress"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
       </div>
     </div>

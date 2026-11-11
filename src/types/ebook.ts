@@ -30,6 +30,48 @@ export interface Ebook {
   featured?: boolean;
 }
 
+export interface FlashSaleConfig {
+  enabled: boolean;
+  badgeBn: string;
+  badgeEn: string;
+  textBn: string;
+  textEn: string;
+  promoCode: string;
+}
+
+export interface AuthorStoryConfig {
+  enabled: boolean;
+  founderName: string;
+  founderNameBn: string;
+  founderRole: string;
+  founderRoleBn: string;
+  headline: string;
+  headlineBn: string;
+  bio: string;
+  bioBn: string;
+}
+
+export interface FAQEntry {
+  id: string;
+  question: string;
+  questionBn: string;
+  answer: string;
+  answerBn: string;
+}
+
+export interface LiveSaleItem {
+  id: string;
+  buyerName: string;
+  buyerNameBn: string;
+  district: string;
+  districtBn: string;
+  bookTitle: string;
+  bookTitleBn: string;
+  timeAgo: string;
+  timeAgoBn: string;
+  bookId?: string;
+}
+
 export interface StoreSettings {
   storeName: string;
   storeNameBn: string;
@@ -47,6 +89,16 @@ export interface StoreSettings {
   adminPasscode: string;
   seo?: SEOSettings;
   coupons?: Coupon[];
+  flashSale?: FlashSaleConfig;
+  authorStory?: AuthorStoryConfig;
+  bundles?: ComboBundle[];
+  showBundlesSection?: boolean;
+  faqs?: FAQEntry[];
+  showFaqSection?: boolean;
+  liveSales?: LiveSaleItem[];
+  showLiveSalesPopup?: boolean;
+  showReviewsSection?: boolean;
+  downloadGiftCouponCode?: string;
 }
 
 export interface Coupon {
@@ -117,3 +169,4 @@ export interface CustomerReview {
   verified: boolean;
   date: string;
 }
+

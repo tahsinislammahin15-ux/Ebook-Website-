@@ -55,8 +55,162 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       description: "25% Special Festive Discount",
       descriptionBn: "২৫% উৎসব স্পেশাল ছাড়",
       isActive: true
+    },
+    {
+      code: "FIRST20",
+      discountType: "percentage",
+      discountValue: 20,
+      description: "20% Bonus Gift Discount for First Paid Order",
+      descriptionBn: "প্রথম পেইড অর্ডারে ২০% থ্যাঙ্ক-ইউ গিফট ছাড়",
+      isActive: true
     }
-  ]
+  ],
+  flashSale: {
+    enabled: true,
+    badgeBn: "আজকের ফ্ল্যাশ সেল",
+    badgeEn: "Today Flash Deal",
+    textBn: "স্পেশাল কুপন কোড দিয়ে যেকোনো পেইড বইয়ে ২০% স্পেশাল ছাড়!",
+    textEn: "Use promo code for Flat 20% Instant Discount on any paid book!",
+    promoCode: "KITAB20"
+  },
+  authorStory: {
+    enabled: true,
+    founderName: "Tahsin Islam",
+    founderNameBn: "তাহসিন ইসলাম (Tahsin Islam)",
+    founderRole: "Founder & Curator, KitabGhar",
+    founderRoleBn: "প্রতিষ্ঠাতা ও প্রধান কিউরেটর, কিতাবঘর",
+    headline: "Empowering Curious Minds Across Bangladesh",
+    headlineBn: "জ্ঞানের আলো ছড়িয়ে দিতেই কিতাবঘরের সৃষ্টি",
+    bio: "KitabGhar was founded with a singular mission: to make premium programming, freelancing, and self-growth knowledge accessible to every Bangladeshi reader without needing international credit cards. With seamless bKash/Nagad verification and 1-click downloads, your reading journey starts here.",
+    bioBn: "বাংলাদেশে আন্তর্জাতিক মানের প্রযুক্তি, প্রোগ্রামিং, ফ্রিল্যান্সিং ও ক্যারিয়ার বিষয়ক ই-বুক সংগ্রহ করা অনেক সময় সাধারণ পাঠকদের জন্য বেশ কঠিন হয়ে দাঁড়ায়। কিতাবঘর তৈরি করা হয়েছে যাতে কোনো ক্রেডিট কার্ড বা ঝামেলা ছাড়াই প্রতিটি শিক্ষার্থী ও পাঠক সহজে বিকাশ ও নগদের মাধ্যমে নির্বাচিত বাংলা ও ইংরেজি ই-বুক সংগ্রহ করতে পারেন এবং সরাসরি ফ্রিতেও সেরা বইগুলো পড়তে পারেন।"
+  },
+  showBundlesSection: true,
+  bundles: [
+    {
+      id: "bundle-dev",
+      name: "Developer & AI Super Combo",
+      nameBn: "প্রোগ্রামার ও এআই সুপার কম্বো প্যাক",
+      tagline: "Python, Modern Web & Next-Gen AI Mastery in 2 Complete E-Books",
+      taglineBn: "পাইথন, আধুনিক ওয়েব আর্কিটেকচার এবং এআই মাস্টারি একসাথে",
+      bookIds: ["ebook-001", "ebook-003"],
+      originalPrice: 750,
+      bundlePrice: 520,
+      savings: 230,
+      badge: "Save 30%",
+      badgeBn: "৩০% সাশ্রয়ী"
+    },
+    {
+      id: "bundle-career",
+      name: "Freelancing & Business Master Bundle",
+      nameBn: "ফ্রিল্যান্সার ও অনলাইন উদ্যোক্তা কম্বো বান্ডেল",
+      tagline: "Step-by-step freelancing dollar income guide + Startup playbook",
+      taglineBn: "আন্তর্জাতিক মার্কেটপ্লেসে ডলার ইনকাম ও স্টার্টআপ তৈরির কৌশল",
+      bookIds: ["ebook-002", "ebook-004"],
+      originalPrice: 850,
+      bundlePrice: 590,
+      savings: 260,
+      badge: "Popular Combo",
+      badgeBn: "জনপ্রিয় কম্বো"
+    }
+  ],
+  showFaqSection: true,
+  faqs: [
+    {
+      id: "faq-1",
+      question: "How do I pay via bKash or Nagad?",
+      questionBn: "বিকাশ বা নগদের মাধ্যমে কীভাবে পেমেন্ট করব?",
+      answer: 'Select any paid e-book and click "Buy via WhatsApp". In the modal, you will see our verified personal bKash (01712-455726) and Nagad (01700-968369) numbers. Send Money the exact amount from your bKash/Nagad app, copy the Transaction ID (TrxID) or attach a screenshot, and click "Send Order via WhatsApp".',
+      answerBn: 'যে বইটি কিনতে চান তার "হোয়াটসঅ্যাপে কিনুন" বাটনে ক্লিক করুন। পপআপে আমাদের বিকাশ পার্সোনাল (০১৭১২-৪৫৫৭২৬) এবং নগদ পার্সোনাল (০১৭০০-৯৬৮৩৬৯) নম্বর পেয়ে যাবেন। আপনার বিকাশ বা নগদ অ্যাপ থেকে "Send Money" করে TrxID অথবা পেমেন্ট স্ক্রিনশট বক্সে বসিয়ে "হোয়াটসঅ্যাপে অর্ডার পাঠান" বাটনে ক্লিক করলেই আপনার হোয়াটসঅ্যাপ ওপেন হবে।'
+    },
+    {
+      id: "faq-2",
+      question: "How quickly will I receive the e-book on WhatsApp?",
+      questionBn: "অর্ডার করার কতক্ষণ পর বইয়ের ডাউনলোড লিংক পাব?",
+      answer: "Our support team monitors WhatsApp 24/7. Once we verify your TrxID or screenshot (typically within 2 to 10 minutes), we will immediately reply with your high-speed Google Drive / Direct PDF download link.",
+      answerBn: "আমাদের হোয়াটসঅ্যাপ টিম নিয়মিত পেমেন্ট যাচাই করে। আপনার TrxID বা স্ক্রিনশট কনফার্ম হওয়ার মাত্র ২ থেকে ১০ মিনিটের মধ্যে সরাসরি হোয়াটসঅ্যাপ চ্যাটে আপনার হাই-স্পিড গুগল ড্রাইভ বা ডিরেক্ট পিডিএফ ডাউনলোড লিংক পাঠিয়ে দেওয়া হবে।"
+    },
+    {
+      id: "faq-3",
+      question: "Can I read these e-books on mobile, tablet, and PC without extra apps?",
+      questionBn: "বইগুলো কি মোবাইল ও ল্যাপটপে সহজে পড়া যাবে? কোনো বাড়তি অ্যাপ লাগবে কি?",
+      answer: "Yes! All e-books are delivered in standard, high-quality PDF and EPUB formats. You can read them directly on Android, iPhone/iPad, Windows, and Mac using any built-in PDF viewer or browser without requiring desktop mode.",
+      answerBn: "হ্যাঁ, অবশ্যই! প্রতিটি ই-বুক ক্রিস্টাল ক্লিয়ার পিডিএফ (PDF) ও ই-পাব (EPUB) ফরম্যাটে তৈরি। আপনি যেকোনো অ্যান্ড্রয়েড মোবাইল, আইফোন, ট্যাবলেট কিংবা ল্যাপটপে সাধারণ PDF ভিউয়ার বা ব্রাউজারে অনায়াসে পড়তে পারবেন।"
+    },
+    {
+      id: "faq-4",
+      question: "How do free e-books work? Are they completely free?",
+      questionBn: "ফ্রি ই-বুকগুলো কি সত্যিই সম্পূর্ণ বিনামূল্যে পাওয়া যাবে?",
+      answer: 'Yes! All e-books marked with a green "Free" badge can be downloaded instantly with 1-click. No signup, registration, credit card, or payment is required. You can also preview sample chapters right on this website.',
+      answerBn: 'হ্যাঁ, ১০০% ফ্রি! যেসব বইতে সবুজ "ফ্রি" ব্যাজ রয়েছে, সেগুলোতে "ফ্রি ডাউনলোড" বাটনে ক্লিক করা মাত্রই আপনার ডিভাইসে সরাসরি প্রিন্টেবল পিডিএফ/এইচটিএমএল ফাইল ডাউনলোড শুরু হয়ে যাবে। কোনো একাউন্ট খোলা বা সাইন-আপ করতে হবে না।'
+    },
+    {
+      id: "faq-5",
+      question: "How do discount coupons work?",
+      questionBn: "কুপন বা ডিসকাউন্ট কোড কীভাবে ব্যবহার করব?",
+      answer: 'During checkout, enter promotional promo codes like "KITAB20" (for 20% off) or "TAHSIN50" (for ৳50 flat discount) into the coupon box and click "Apply". The discounted price will automatically be reflected in your total payable amount and formatted WhatsApp message.',
+      answerBn: 'পেইড বইয়ের চেকআউট করার সময় কুপন বক্সে "KITAB20" (২০% ছাড়) বা "TAHSIN50" (৳৫০ ফ্ল্যাট ছাড়) লিখে "প্রয়োগ করুন" চাপলে সাথে সাথে মোট মূল্য কমে যাবে এবং হোয়াটসঅ্যাপ মেসেজেও ছাড় হিসাব হয়ে যাবে।'
+    },
+    {
+      id: "faq-6",
+      question: "What if I encounter an issue with payment or download link?",
+      questionBn: "পেমেন্ট বা ডাউনলোড করতে কোনো সমস্যা হলে কী করব?",
+      answer: "KitabGhar offers 100% money-back guarantee. If you face any trouble downloading or opening the file, message us directly on WhatsApp (+880 1700-968369) with your screenshot, and we will resolve it immediately or replace the link.",
+      answerBn: "কিতাবঘরে পাঠকদের সন্তুষ্টি প্রথম অগ্রাধিকার। কোনো ফাইল ওপেন করতে বা লিংক পেতে সমস্যা হলে সরাসরি আমাদের অফিশিয়াল হোয়াটসঅ্যাপ (+৮৮০ ১৭০০-৯৬৮৩৬৯) নম্বরে মেসেজ করুন, তাৎক্ষণিক সমাধান দেওয়া হবে।"
+    }
+  ],
+  showLiveSalesPopup: true,
+  liveSales: [
+    {
+      id: "s1",
+      buyerName: "Hasib Rahman",
+      buyerNameBn: "হাসিব রহমান",
+      district: "Mirpur, Dhaka",
+      districtBn: "মিরপুর, ঢাকা",
+      bookTitle: "Modern Web Architecture",
+      bookTitleBn: "মডার্ন ওয়েব আর্কিটেকচার",
+      timeAgo: "3 minutes ago",
+      timeAgoBn: "৩ মিনিট আগে",
+      bookId: "ebook-001"
+    },
+    {
+      id: "s2",
+      buyerName: "Tanveer Ahmed",
+      buyerNameBn: "তানভীর আহমেদ",
+      district: "Agrabad, Chittagong",
+      districtBn: "আগ্রাবাদ, চট্টগ্রাম",
+      bookTitle: "Remote Work & Freelancing Blueprint",
+      bookTitleBn: "রিমোট ওয়ার্ক ও ফ্রিল্যান্সিং ব্লুপ্রিন্ট",
+      timeAgo: "7 minutes ago",
+      timeAgoBn: "৭ মিনিট আগে",
+      bookId: "ebook-002"
+    },
+    {
+      id: "s3",
+      buyerName: "Nusrat Jahan",
+      buyerNameBn: "নুসরাত জাহান",
+      district: "Uttara, Dhaka",
+      districtBn: "উত্তরা, ঢাকা",
+      bookTitle: "Zero to Scale: Modern Business Growth",
+      bookTitleBn: "জিরো টু স্কেল: আধুনিক ব্যবসা সম্প্রসারণ গাইড",
+      timeAgo: "12 minutes ago",
+      timeAgoBn: "১২ মিনিট আগে",
+      bookId: "ebook-004"
+    },
+    {
+      id: "s4",
+      buyerName: "Mahmudul Hasan",
+      buyerNameBn: "মাহমুদুল হাসান",
+      district: "Zindabazar, Sylhet",
+      districtBn: "জিন্দাবাজার, সিলেট",
+      bookTitle: "Modern Web Architecture",
+      bookTitleBn: "মডার্ন ওয়েব আর্কিটেকচার",
+      timeAgo: "18 minutes ago",
+      timeAgoBn: "১৮ মিনিট আগে",
+      bookId: "ebook-001"
+    }
+  ],
+  showReviewsSection: true,
+  downloadGiftCouponCode: "FIRST20"
 };
 
 export const DEFAULT_EBOOKS: Ebook[] = [

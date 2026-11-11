@@ -18,6 +18,7 @@ import { ReadingResumeBanner } from './components/ReadingResumeBanner';
 import { ComboDealsSection } from './components/ComboDealsSection';
 import { ReviewsSection } from './components/ReviewsSection';
 import { DownloadGiftModal } from './components/DownloadGiftModal';
+import { AuthorStorySection } from './components/AuthorStorySection';
 import { BookX } from 'lucide-react';
 
 function StorefrontContent() {
@@ -304,6 +305,9 @@ function StorefrontContent() {
 
       {/* 4. Customer Verified Reviews & 5-Star Ratings */}
       <ReviewsSection />
+
+      {/* 5. Author & Founder Trust Story Section */}
+      <AuthorStorySection />
 
       {/* FAQ (Frequently Asked Questions) Section */}
       <FAQSection />
