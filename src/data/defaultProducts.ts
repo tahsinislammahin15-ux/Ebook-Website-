@@ -13,8 +13,11 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   nagadNumber: "01700-968369", // User's exact Nagad number
   nagadType: "Personal",
   currencySymbol: "৳",
-  adminUsername: "tahsinislam",
-  adminPasscode: "tahsinislam4567", // User's requested admin password
+  heroTitle: "Curated Digital E-Books for Builders & Thinkers",
+  heroTitleBn: "প্রযুক্তি, ক্যারিয়ার ও ব্যবসার সেরা ডিজিটাল ই-বুক সংগ্রহ",
+  heroSubtitle: "Download free open-access guides with one click, or purchase premium e-books instantly via WhatsApp with personal bKash & Nagad verification.",
+  heroSubtitleBn: "এক ক্লিকে ফ্রি ই-বুক ডাউনলোড করুন অথবা বিকাশ ও নগদ পেমেন্ট ভেরিফিকেশনের মাধ্যমে হোয়াটসঅ্যাপে তাৎক্ষণিক প্রিমিয়াম বই অর্ডার করুন।",
+  showHowItWorksSection: true,
   seo: {
     metaTitle: "KitabGhar - Digital E-Book Store | Free & Paid E-Books",
     metaTitleBn: "কিতাবঘর - ডিজিটাল ই-বুক স্টোর ও হোয়াটসঅ্যাপ অর্ডার",

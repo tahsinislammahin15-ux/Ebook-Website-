@@ -85,8 +85,10 @@ export interface StoreSettings {
   nagadNumber: string;
   nagadType: 'Personal' | 'Merchant';
   currencySymbol: string;
-  adminUsername: string; // e.g. "tahsinislam"
-  adminPasscode: string;
+  adminUsername?: string;
+  adminPasscode?: string;
+  adminUsernameHash?: string;
+  adminPasscodeHash?: string;
   seo?: SEOSettings;
   coupons?: Coupon[];
   flashSale?: FlashSaleConfig;
@@ -98,7 +100,12 @@ export interface StoreSettings {
   liveSales?: LiveSaleItem[];
   showLiveSalesPopup?: boolean;
   showReviewsSection?: boolean;
+  showHowItWorksSection?: boolean;
   downloadGiftCouponCode?: string;
+  heroTitle?: string;
+  heroTitleBn?: string;
+  heroSubtitle?: string;
+  heroSubtitleBn?: string;
 }
 
 export interface Coupon {

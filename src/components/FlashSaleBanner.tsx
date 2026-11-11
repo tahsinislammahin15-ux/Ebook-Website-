@@ -54,6 +54,18 @@ export const FlashSaleBanner: React.FC = () => {
     promoCode: 'KITAB20'
   };
 
+  // Automatically re-show banner if owner updates or re-enables Flash Sale in Admin Panel
+  useEffect(() => {
+    if (flashConfig.enabled) {
+      setIsDismissed(false);
+      try {
+        sessionStorage.removeItem('kitabghor_dismiss_flash_banner');
+      } catch {
+        // ignore
+      }
+    }
+  }, [flashConfig.enabled, flashConfig.badgeBn, flashConfig.textBn, flashConfig.promoCode]);
+
   if (isDismissed || flashConfig.enabled === false) return null;
 
   const handleDismiss = () => {

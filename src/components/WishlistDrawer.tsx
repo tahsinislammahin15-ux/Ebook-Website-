@@ -52,12 +52,8 @@ export const WishlistDrawer: React.FC = () => {
             <div className="flex items-center gap-2">
               {savedBooks.length > 0 && (
                 <button
-                  onClick={() => {
-                    if (confirm(language === 'bn' ? 'সব বই কি তালিকা থেকে মুছে ফেলতে চান?' : 'Clear all books from wishlist?')) {
-                      clearWishlist();
-                    }
-                  }}
-                  className="text-xs text-slate-400 hover:text-rose-500 transition-colors p-1.5"
+                  onClick={() => clearWishlist()}
+                  className="text-xs text-slate-400 hover:text-rose-500 transition-colors p-1.5 cursor-pointer"
                   title={t.clearWishlist}
                 >
                   <Trash2 className="w-4 h-4" />

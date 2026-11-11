@@ -18,20 +18,37 @@ export const ReviewsSection: React.FC = () => {
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !comment.trim()) return;
+    const cleanName = name.replace(/<\s*\/?\s*script[^>]*>/gi, '').trim().slice(0, 60);
+    const cleanRole = role.replace(/<\s*\/?\s*script[^>]*>/gi, '').trim().slice(0, 60);
+    const cleanComment = comment.replace(/<\s*\/?\s*script[^>]*>/gi, '').trim().slice(0, 500);
+    if (!cleanName || !cleanComment) return;
+
+    // Rate-limit public review submissions (max 1 review per 60 seconds)
+    try {
+      const lastSub = sessionStorage.getItem('kitabghor_last_review_ts');
+      if (lastSub && Date.now() - parseInt(lastSub, 10) < 60000) {
+        setShowAddReview(false);
+        return;
+      }
+      sessionStorage.setItem('kitabghor_last_review_ts', Date.now().toString());
+    } catch {
+      // ignore
+    }
+
+    const safeRating = Math.min(5, Math.max(1, Number(rating) || 5));
 
     const newRev: CustomerReview = {
       id: `rev-${Date.now()}`,
-      name: name.trim(),
-      nameBn: name.trim(),
-      role: role.trim() || 'Verified Reader',
-      roleBn: role.trim() || 'যাচাইকৃত পাঠক',
+      name: cleanName,
+      nameBn: cleanName,
+      role: cleanRole || 'Verified Reader',
+      roleBn: cleanRole || 'যাচাইকৃত পাঠক',
       avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80`,
-      rating,
-      comment: comment.trim(),
-      commentBn: comment.trim(),
-      bookTitle,
-      bookTitleBn: bookTitle,
+      rating: safeRating,
+      comment: cleanComment,
+      commentBn: cleanComment,
+      bookTitle: bookTitle.slice(0, 120),
+      bookTitleBn: bookTitle.slice(0, 120),
       verified: true,
       date: language === 'bn' ? 'এইমাত্র' : 'Just now'
     };

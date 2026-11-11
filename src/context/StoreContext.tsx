@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Ebook, StoreSettings, SiteLanguage, Coupon, ReadingProgress, CustomerReview } from '../types/ebook';
 import { DEFAULT_EBOOKS, DEFAULT_STORE_SETTINGS } from '../data/defaultProducts';
 import { TRANSLATIONS } from '../data/translations';
+import { escapeHtml, sanitizeUrl, sanitizeText, safeJsonParse, computeSaltedHash } from '../utils/security';
 
 interface StoreContextType {
   ebooks: Ebook[];
@@ -49,7 +50,11 @@ interface StoreContextType {
   closeDownloadGiftModal: () => void;
   reviews: CustomerReview[];
   addReview: (rev: CustomerReview) => void;
+  updateReview: (id: string, updated: Partial<CustomerReview>) => void;
   deleteReview: (id: string) => void;
+  resetAllSettings: () => void;
+  exportFullStoreBackupJSON: () => void;
+  importFullStoreBackupJSON: (jsonStr: string) => boolean;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -65,7 +70,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_PRODUCTS);
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = safeJsonParse<Ebook[]>(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {
@@ -74,15 +79,38 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return DEFAULT_EBOOKS;
   });
 
+  // Helper to strip any plaintext credentials and convert them to salted SHA-256 hashes
+  const scrubSettingsCredentials = (raw: Partial<StoreSettings>): StoreSettings => {
+    const merged: StoreSettings = {
+      ...DEFAULT_STORE_SETTINGS,
+      ...raw,
+      seo: { ...DEFAULT_STORE_SETTINGS.seo!, ...(raw.seo || {}) },
+      flashSale: { ...DEFAULT_STORE_SETTINGS.flashSale!, ...(raw.flashSale || {}) },
+      authorStory: { ...DEFAULT_STORE_SETTINGS.authorStory!, ...(raw.authorStory || {}) }
+    };
+
+    if (merged.adminUsername && merged.adminUsername.trim()) {
+      merged.adminUsernameHash = computeSaltedHash(merged.adminUsername.trim().toLowerCase());
+      delete merged.adminUsername;
+    }
+    if (merged.adminPasscode && merged.adminPasscode.trim()) {
+      merged.adminPasscodeHash = computeSaltedHash(merged.adminPasscode.trim());
+      delete merged.adminPasscode;
+    }
+    return merged;
+  };
+
   const [settings, setSettings] = useState<StoreSettings>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_SETTINGS);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          ...DEFAULT_STORE_SETTINGS,
-          ...parsed
-        };
+        const parsed = safeJsonParse<Partial<StoreSettings>>(saved);
+        if (parsed && typeof parsed === 'object') {
+          const scrubbed = scrubSettingsCredentials(parsed);
+          // Re-persist scrubbed settings so any legacy plaintext password is wiped from localStorage immediately
+          localStorage.setItem(LOCAL_STORAGE_KEY_SETTINGS, JSON.stringify(scrubbed));
+          return scrubbed;
+        }
       }
     } catch {
       // fallback
@@ -132,6 +160,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return settings.coupons || DEFAULT_STORE_SETTINGS.coupons || [];
   });
   const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
+
+  // Sync coupons whenever settings.coupons changes
+  useEffect(() => {
+    if (settings.coupons) {
+      setCoupons(settings.coupons);
+    }
+  }, [settings.coupons]);
 
   // Reading progress tracking (per book)
   const LOCAL_STORAGE_KEY_PROGRESS = 'kitabghor_reading_progress';
@@ -247,6 +282,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const updateReview = (id: string, updated: Partial<CustomerReview>) => {
+    setReviews(prev => {
+      const next = prev.map(r => (r.id === id ? { ...r, ...updated } : r));
+      localStorage.setItem(LOCAL_STORAGE_KEY_REVIEWS, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const deleteReview = (id: string) => {
     setReviews(prev => {
       const next = prev.filter(r => r.id !== id);
@@ -254,6 +297,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return next;
     });
   };
+
+  // Cross-tab real-time synchronization so changes in one tab immediately update all open tabs without refresh
+  useEffect(() => {
+    const handleStorageSync = (e: StorageEvent) => {
+      try {
+        if (e.key === LOCAL_STORAGE_KEY_SETTINGS && e.newValue) {
+          const parsed = safeJsonParse<Partial<StoreSettings>>(e.newValue);
+          if (parsed && typeof parsed === 'object') {
+            setSettings(scrubSettingsCredentials(parsed));
+          }
+        } else if (e.key === LOCAL_STORAGE_KEY_PRODUCTS && e.newValue) {
+          const parsed = safeJsonParse<Ebook[]>(e.newValue);
+          if (Array.isArray(parsed)) setEbooks(parsed);
+        } else if (e.key === LOCAL_STORAGE_KEY_REVIEWS && e.newValue) {
+          const parsed = safeJsonParse<CustomerReview[]>(e.newValue);
+          if (Array.isArray(parsed)) setReviews(parsed);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    };
+    window.addEventListener('storage', handleStorageSync);
+    return () => window.removeEventListener('storage', handleStorageSync);
+  }, []);
 
   const openWishlist = () => setIsWishlistOpen(true);
   const closeWishlist = () => setIsWishlistOpen(false);
@@ -362,7 +429,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings(prev => {
-      const next = { ...prev, ...newSettings };
+      const next = scrubSettingsCredentials({ ...prev, ...newSettings });
       localStorage.setItem(LOCAL_STORAGE_KEY_SETTINGS, JSON.stringify(next));
       return next;
     });
@@ -384,6 +451,99 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resetCatalog = () => {
     localStorage.removeItem(LOCAL_STORAGE_KEY_PRODUCTS);
     setEbooks(DEFAULT_EBOOKS);
+  };
+
+  const resetAllSettings = () => {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_SETTINGS);
+    localStorage.removeItem(LOCAL_STORAGE_KEY_REVIEWS);
+    setSettings(DEFAULT_STORE_SETTINGS);
+    setCoupons(DEFAULT_STORE_SETTINGS.coupons || []);
+    setReviews(INITIAL_REVIEWS);
+  };
+
+  const exportFullStoreBackupJSON = () => {
+    // Strip any internal auth hashes before exporting so backup files never leak credentials
+    const safeSettings = { ...settings };
+    delete safeSettings.adminUsername;
+    delete safeSettings.adminPasscode;
+    delete safeSettings.adminUsernameHash;
+    delete safeSettings.adminPasscodeHash;
+
+    const backup = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      ebooks,
+      settings: safeSettings,
+      reviews
+    };
+    const jsonStr = JSON.stringify(backup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kitabghar-full-backup.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const importFullStoreBackupJSON = (jsonStr: string): boolean => {
+    try {
+      // Enforce 2MB maximum payload size to prevent DoS / storage exhaustion
+      if (!jsonStr || jsonStr.length > 2 * 1024 * 1024) return false;
+      const parsed = safeJsonParse<{
+        ebooks?: Ebook[];
+        settings?: Partial<StoreSettings>;
+        reviews?: CustomerReview[];
+      }>(jsonStr);
+      if (!parsed || typeof parsed !== 'object') return false;
+
+      if (Array.isArray(parsed.ebooks)) {
+        const sanitizedBooks: Ebook[] = parsed.ebooks.slice(0, 200).map((b, idx) => ({
+          ...b,
+          id: sanitizeText(b.id, 80) || `ebook-restored-${idx}`,
+          title: sanitizeText(b.title, 200) || 'Untitled E-Book',
+          titleBn: sanitizeText(b.titleBn, 200),
+          author: sanitizeText(b.author, 150) || 'Anonymous',
+          authorBn: sanitizeText(b.authorBn, 150),
+          coverImage: sanitizeUrl(b.coverImage, '/src/assets/images/book_cover_web_dev_1794299826686.jpg'),
+          downloadUrl: sanitizeUrl(b.downloadUrl, ''),
+          price: Math.max(0, Number(b.price) || 0),
+          pages: Math.max(1, Number(b.pages) || 100),
+          rating: Math.min(5, Math.max(1, Number(b.rating) || 4.9))
+        }));
+        setEbooks(sanitizedBooks);
+        localStorage.setItem(LOCAL_STORAGE_KEY_PRODUCTS, JSON.stringify(sanitizedBooks));
+      }
+      if (parsed.settings && typeof parsed.settings === 'object') {
+        const mergedSettings = scrubSettingsCredentials({
+          ...settings,
+          ...parsed.settings,
+          // Preserve existing owner auth hashes
+          adminUsernameHash: settings.adminUsernameHash,
+          adminPasscodeHash: settings.adminPasscodeHash
+        });
+        setSettings(mergedSettings);
+        localStorage.setItem(LOCAL_STORAGE_KEY_SETTINGS, JSON.stringify(mergedSettings));
+      }
+      if (Array.isArray(parsed.reviews)) {
+        const sanitizedReviews = parsed.reviews.slice(0, 200).map((r, idx) => ({
+          ...r,
+          id: sanitizeText(r.id, 80) || `rev-restored-${idx}`,
+          name: sanitizeText(r.name, 80),
+          nameBn: sanitizeText(r.nameBn, 80),
+          comment: sanitizeText(r.comment, 600),
+          commentBn: sanitizeText(r.commentBn, 600),
+          rating: Math.min(5, Math.max(1, Number(r.rating) || 5))
+        }));
+        setReviews(sanitizedReviews);
+        localStorage.setItem(LOCAL_STORAGE_KEY_REVIEWS, JSON.stringify(sanitizedReviews));
+      }
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const applyCoupon = (code: string, currentPrice = 0) => {
@@ -452,29 +612,39 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  // Direct free ebook downloader
+  // Direct free ebook downloader (hardened against XSS and dangerous URL protocols)
   const generateEbookDownload = (book: Ebook) => {
-    if (book.downloadUrl && book.downloadUrl !== '#' && book.downloadUrl.trim() !== '') {
+    const safeDownloadUrl = sanitizeUrl(book.downloadUrl, '');
+    if (safeDownloadUrl && safeDownloadUrl !== '#') {
       const a = document.createElement('a');
-      a.href = book.downloadUrl;
+      a.href = safeDownloadUrl;
+      a.rel = 'noopener noreferrer';
       a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setDownloadGiftModalBook(book);
       return;
     }
 
-    const title = language === 'bn' && book.titleBn ? book.titleBn : book.title;
-    const author = language === 'bn' && book.authorBn ? book.authorBn : book.author;
-    const desc = language === 'bn' && book.descriptionBn ? book.descriptionBn : book.description;
-    const excerpt = language === 'bn' && book.previewExcerptBn ? book.previewExcerptBn : book.previewExcerpt;
-    const toc = language === 'bn' && book.tableOfContentsBn ? book.tableOfContentsBn : book.tableOfContents;
+    const rawTitle = language === 'bn' && book.titleBn ? book.titleBn : book.title;
+    const title = escapeHtml(rawTitle);
+    const author = escapeHtml(language === 'bn' && book.authorBn ? book.authorBn : book.author);
+    const desc = escapeHtml(language === 'bn' && book.descriptionBn ? book.descriptionBn : book.description);
+    const excerpt = escapeHtml(language === 'bn' && book.previewExcerptBn ? book.previewExcerptBn : book.previewExcerpt);
+    const rawToc = language === 'bn' && book.tableOfContentsBn ? book.tableOfContentsBn : book.tableOfContents;
+    const toc = Array.isArray(rawToc) ? rawToc.map(item => escapeHtml(item)) : [];
+    const safeCategory = escapeHtml(book.category);
+    const safePages = escapeHtml(book.pages);
+    const safeStoreName = escapeHtml(language === 'bn' ? settings.storeNameBn : settings.storeName);
+    const safeStoreTagline = escapeHtml(language === 'bn' ? settings.storeTaglineBn : settings.storeTagline);
+    const safeWhatsapp = escapeHtml(settings.whatsappDisplayNumber);
 
     const htmlDocument = `<!DOCTYPE html>
-<html lang="${language}">
+<html lang="${escapeHtml(language)}">
 <head>
   <meta charset="utf-8">
-  <title>${title} - ${settings.storeName}</title>
+  <title>${title} - ${escapeHtml(settings.storeName)}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     @page { size: A4; margin: 20mm; }
@@ -577,8 +747,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <h1>${title}</h1>
     <div class="author">${language === 'bn' ? 'লেখক:' : 'By'} ${author}</div>
     <div class="meta-grid">
-      <div><div class="meta-label">${language === 'bn' ? 'ক্যাটেগরি' : 'Category'}</div><strong>${book.category}</strong></div>
-      <div><div class="meta-label">${language === 'bn' ? 'পৃষ্ঠা' : 'Pages'}</div><strong>${book.pages}</strong></div>
+      <div><div class="meta-label">${language === 'bn' ? 'ক্যাটেগরি' : 'Category'}</div><strong>${safeCategory}</strong></div>
+      <div><div class="meta-label">${language === 'bn' ? 'পৃষ্ঠা' : 'Pages'}</div><strong>${safePages}</strong></div>
       <div><div class="meta-label">${language === 'bn' ? 'ফরম্যাট' : 'Format'}</div><strong>PDF Reader Ready</strong></div>
     </div>
   </div>
@@ -595,8 +765,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   <div class="excerpt-box">${excerpt}</div>
 
   <div class="footer">
-    <p><strong>${language === 'bn' ? settings.storeNameBn : settings.storeName}</strong> - ${language === 'bn' ? settings.storeTaglineBn : settings.storeTagline}</p>
-    <p>WhatsApp Support: ${settings.whatsappDisplayNumber}</p>
+    <p><strong>${safeStoreName}</strong> - ${safeStoreTagline}</p>
+    <p>WhatsApp Support: ${safeWhatsapp}</p>
   </div>
 </body>
 </html>`;
@@ -605,7 +775,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_')}_KitabGhar.html`;
+    a.download = `${rawTitle.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_')}_KitabGhar.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -663,7 +833,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         closeDownloadGiftModal,
         reviews,
         addReview,
-        deleteReview
+        updateReview,
+        deleteReview,
+        resetAllSettings,
+        exportFullStoreBackupJSON,
+        importFullStoreBackupJSON
       }}
     >
       {children}

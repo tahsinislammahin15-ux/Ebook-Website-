@@ -99,6 +99,24 @@ export const LiveSalesNotification: React.FC = () => {
   const salesList = settings.liveSales && settings.liveSales.length > 0 ? settings.liveSales : RECENT_SALES;
   const popupEnabled = settings.showLiveSalesPopup !== false;
 
+  // Reset dismissal and show immediately when owner enables popup or edits liveSales
+  useEffect(() => {
+    if (popupEnabled) {
+      setIsDismissed(false);
+    }
+  }, [popupEnabled, salesList.length]);
+
+  // Listen for manual preview trigger from Admin Panel
+  useEffect(() => {
+    const handleTrigger = () => {
+      setIsDismissed(false);
+      setCurrentIndex(0);
+      setIsVisible(true);
+    };
+    window.addEventListener('kitabghar:trigger-live-sale-toast', handleTrigger);
+    return () => window.removeEventListener('kitabghar:trigger-live-sale-toast', handleTrigger);
+  }, []);
+
   useEffect(() => {
     if (isDismissed || !popupEnabled || salesList.length === 0) return;
 

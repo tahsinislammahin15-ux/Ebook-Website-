@@ -147,7 +147,13 @@ Please verify my payment and send me the e-book download link. Thank you!`;
   const handleSendWhatsApp = () => {
     if (!isFormValid) return;
     setOrderSent(true);
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    const a = document.createElement('a');
+    a.href = whatsappUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (

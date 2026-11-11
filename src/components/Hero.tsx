@@ -15,9 +15,17 @@ export const Hero: React.FC<HeroProps> = ({
   onExploreFree,
   onExplorePaid
 }) => {
-  const { ebooks, t } = useStore();
+  const { ebooks, t, settings, language } = useStore();
   const freeCount = ebooks.filter(b => b.type === 'free').length;
   const paidCount = ebooks.filter(b => b.type === 'paid').length;
+
+  const activeHeroTitle = language === 'bn'
+    ? (settings.heroTitleBn || t.heroTitle)
+    : (settings.heroTitle || t.heroTitle);
+
+  const activeHeroSubtitle = language === 'bn'
+    ? (settings.heroSubtitleBn || t.heroSubtitle)
+    : (settings.heroSubtitle || t.heroSubtitle);
 
   return (
     <section className="relative overflow-hidden pt-10 pb-12 border-b border-slate-200 dark:border-slate-800 bg-linear-to-b from-slate-100/70 to-white dark:from-slate-900/50 dark:to-slate-950">
@@ -35,11 +43,11 @@ export const Hero: React.FC<HeroProps> = ({
 
           {/* Primary Headline with balance */}
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white" style={{ textWrap: 'balance' }}>
-            {t.heroTitle}
+            {activeHeroTitle}
           </h1>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto">
-            {t.heroSubtitle}
+            {activeHeroSubtitle}
           </p>
 
           {/* Live Search Input */}

@@ -9,9 +9,18 @@ import {
   Sliders, HelpCircle, Star, ShoppingBag, Gift, UserCheck
 } from 'lucide-react';
 
-const LOCKOUT_KEY = 'kitabghor_admin_lockout';
-const ATTEMPTS_KEY = 'kitabghor_admin_failed_attempts';
-const SESSION_KEY = 'kitabghor_admin_session_auth';
+import {
+  verifyOwnerCredentials,
+  createAdminSession,
+  hasValidAdminSession,
+  clearAdminSession,
+  computeSaltedHash,
+  escapeHtml,
+  sanitizeUrl
+} from '../utils/security';
+
+const LOCKOUT_KEY = 'kitabghor_admin_lockout_v3';
+const ATTEMPTS_KEY = 'kitabghor_admin_failed_attempts_v3';
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 3 * 60 * 1000; // 3 minutes
 
@@ -19,34 +28,34 @@ export const AdminModal: React.FC = () => {
   const { 
     isAdminOpen, closeAdmin, ebooks, settings, 
     addEbook, updateEbook, deleteEbook, updateSettings, 
-    exportProductsJSON, resetCatalog, language,
+    exportProductsJSON, resetCatalog, resetAllSettings,
+    exportFullStoreBackupJSON, importFullStoreBackupJSON,
+    language,
     coupons, addCoupon, deleteCoupon, toggleCoupon,
-    reviews, addReview, deleteReview
+    reviews, addReview, updateReview, deleteReview
   } = useStore();
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passcodeInput, setPasscodeInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [newAdminUser, setNewAdminUser] = useState('');
+  const [newAdminPass, setNewAdminPass] = useState('');
   
-  // Rate limiting & lockout state
+  // Rate limiting & lockout state (persisted in localStorage so opening a new tab cannot bypass lockout)
   const [lockoutRemaining, setLockoutRemaining] = useState<number>(0);
   const [failedAttempts, setFailedAttempts] = useState<number>(() => {
     try {
-      const saved = sessionStorage.getItem(ATTEMPTS_KEY);
+      const saved = localStorage.getItem(ATTEMPTS_KEY) || sessionStorage.getItem(ATTEMPTS_KEY);
       return saved ? parseInt(saved, 10) : 0;
     } catch {
       return 0;
     }
   });
 
-  // Session state
+  // Cryptographically signed session state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(SESSION_KEY) === 'authenticated';
-    } catch {
-      return false;
-    }
+    return hasValidAdminSession(settings.adminPasscodeHash);
   });
 
   const [activeTab, setActiveTab] = useState<'books' | 'sections' | 'bundles_faq' | 'coupons' | 'settings' | 'seo' | 'cpanel'>('books');
@@ -114,7 +123,8 @@ export const AdminModal: React.FC = () => {
   const [newCouponDesc, setNewCouponDesc] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // New Bundle form state
+  // New / Edit Bundle form state
+  const [editingBundleId, setEditingBundleId] = useState<string | null>(null);
   const [bundleNameBn, setBundleNameBn] = useState('');
   const [bundleNameEn, setBundleNameEn] = useState('');
   const [bundleTaglineBn, setBundleTaglineBn] = useState('');
@@ -123,24 +133,40 @@ export const AdminModal: React.FC = () => {
   const [bundleBadgeBn, setBundleBadgeBn] = useState('স্পেশাল কম্বো অফার');
   const [selectedBundleBooks, setSelectedBundleBooks] = useState<string[]>([]);
 
-  // New FAQ form state
+  // New / Edit FAQ form state
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
   const [faqQBn, setFaqQBn] = useState('');
   const [faqQEn, setFaqQEn] = useState('');
   const [faqABn, setFaqABn] = useState('');
   const [faqAEn, setFaqAEn] = useState('');
 
-  // New Live Sale form state
+  // New / Edit Live Sale form state
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
   const [saleBuyerBn, setSaleBuyerBn] = useState('');
   const [saleDistrictBn, setSaleDistrictBn] = useState('');
   const [saleBookBn, setSaleBookBn] = useState('');
   const [saleTimeBn, setSaleTimeBn] = useState('৫ মিনিট আগে');
 
-  // New Admin Review form state
+  // New / Edit Admin Review form state
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [revNameBn, setRevNameBn] = useState('');
   const [revRoleBn, setRevRoleBn] = useState('যাচাইকৃত পাঠক');
   const [revBookBn, setRevBookBn] = useState('পাইথন ও এআই মাস্টারি');
   const [revCommentBn, setRevCommentBn] = useState('');
   const [revRating, setRevRating] = useState<number>(5);
+
+  // Real-time auto-save helpers so the owner never has to re-enter data or refresh the browser
+  const handleLiveSettingChange = (patch: Partial<typeof settingsForm>) => {
+    const next = { ...settingsForm, ...patch };
+    setSettingsForm(next);
+    updateSettings(patch);
+  };
+
+  const handleLiveSeoChange = (patch: Partial<SEOSettings>) => {
+    const next = { ...seoForm, ...patch };
+    setSeoForm(next);
+    updateSettings({ seo: next });
+  };
 
   useEffect(() => {
     setSettingsForm(settings);
@@ -149,17 +175,19 @@ export const AdminModal: React.FC = () => {
     }
   }, [settings]);
 
-  // Lockout countdown timer
+  // Lockout countdown timer (checked across localStorage & sessionStorage)
   useEffect(() => {
     const checkLockout = () => {
       try {
-        const lockoutUntil = sessionStorage.getItem(LOCKOUT_KEY);
+        const lockoutUntil = localStorage.getItem(LOCKOUT_KEY) || sessionStorage.getItem(LOCKOUT_KEY);
         if (lockoutUntil) {
           const diff = parseInt(lockoutUntil, 10) - Date.now();
           if (diff > 0) {
             setLockoutRemaining(Math.ceil(diff / 1000));
           } else {
             setLockoutRemaining(0);
+            localStorage.removeItem(LOCKOUT_KEY);
+            localStorage.removeItem(ATTEMPTS_KEY);
             sessionStorage.removeItem(LOCKOUT_KEY);
             sessionStorage.removeItem(ATTEMPTS_KEY);
             setFailedAttempts(0);
@@ -181,34 +209,34 @@ export const AdminModal: React.FC = () => {
     e.preventDefault();
     if (lockoutRemaining > 0) return;
 
-    const cleanUser = usernameInput.trim().toLowerCase();
-    const cleanPass = passcodeInput.trim();
+    const isVerified = verifyOwnerCredentials(
+      usernameInput,
+      passcodeInput,
+      settings.adminUsernameHash,
+      settings.adminPasscodeHash
+    );
 
-    // Valid identifiers allowed for owner:
-    const validUsernames = [
-      (settings.adminUsername || 'tahsinislam').toLowerCase(),
-      'tahsin',
-      'tahsinislam',
-      'tahsinislammahin15@gmail.com'
-    ];
-
-    const isUserValid = validUsernames.includes(cleanUser);
-    const isPassValid = cleanPass === (settings.adminPasscode || 'tahsinislam4567');
-
-    if (isUserValid && isPassValid) {
+    if (isVerified) {
+      createAdminSession(settings.adminPasscodeHash);
       setIsAuthenticated(true);
       setAuthError('');
       setFailedAttempts(0);
+      setUsernameInput('');
+      setPasscodeInput('');
+      localStorage.removeItem(ATTEMPTS_KEY);
+      localStorage.removeItem(LOCKOUT_KEY);
       sessionStorage.removeItem(ATTEMPTS_KEY);
       sessionStorage.removeItem(LOCKOUT_KEY);
-      sessionStorage.setItem(SESSION_KEY, 'authenticated');
+      window.dispatchEvent(new CustomEvent('kitabghar:admin-auth-changed'));
     } else {
       const nextAttempts = failedAttempts + 1;
       setFailedAttempts(nextAttempts);
+      localStorage.setItem(ATTEMPTS_KEY, nextAttempts.toString());
       sessionStorage.setItem(ATTEMPTS_KEY, nextAttempts.toString());
 
       if (nextAttempts >= MAX_ATTEMPTS) {
         const lockoutTime = Date.now() + LOCKOUT_DURATION_MS;
+        localStorage.setItem(LOCKOUT_KEY, lockoutTime.toString());
         sessionStorage.setItem(LOCKOUT_KEY, lockoutTime.toString());
         setLockoutRemaining(Math.ceil(LOCKOUT_DURATION_MS / 1000));
         setAuthError(
@@ -229,9 +257,10 @@ export const AdminModal: React.FC = () => {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem(SESSION_KEY);
+    clearAdminSession();
     setUsernameInput('');
     setPasscodeInput('');
+    window.dispatchEvent(new CustomEvent('kitabghar:admin-auth-changed'));
     closeAdmin();
   };
 
@@ -276,13 +305,12 @@ export const AdminModal: React.FC = () => {
 
   const handleSaveBook = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookForm.title || !bookForm.author) {
-      alert(language === 'bn' ? 'অনুগ্রহ করে বইয়ের নাম ও লেখক দিন।' : 'Please provide at least a title and author.');
+    if (!bookForm.title && !bookForm.titleBn) {
       return;
     }
 
     const payload: Omit<Ebook, 'id'> = {
-      title: bookForm.title || 'Untitled Ebook',
+      title: bookForm.title || bookForm.titleBn || 'Untitled Ebook',
       titleBn: bookForm.titleBn || bookForm.title,
       author: bookForm.author || 'Anonymous',
       authorBn: bookForm.authorBn || bookForm.author,
@@ -353,29 +381,34 @@ export const AdminModal: React.FC = () => {
       ogDescription: `Instant PDF downloads and WhatsApp mobile banking checkout for programming, freelancing, and business guides.`,
       ogDescriptionBn: `প্রোগ্রামিং, ফ্রিল্যান্সিং ও ক্যারিয়ারের সেরা বই পড়ুন। ফ্রি ডাউনলোড এবং বিকাশ ও নগদে সহজ হোয়াটসঅ্যাপ অর্ডার।`,
       keywords: `${store.toLowerCase()}, bangla ebook, pdf download bd, bkash payment ebook, freelancing bangla pdf, programming book bangla, kitabghar e-book, কিতাবঘর, ফ্রি বই ডাউনলোড`,
-      author: settings.adminUsername || "Tahsin Islam",
+      author: seoForm.author || "Tahsin Islam",
       siteName: store
     };
 
     setSeoForm(optimized);
+    updateSettings({ seo: optimized });
     setAutoOptimizedNotice(true);
     setTimeout(() => setAutoOptimizedNotice(false), 3000);
   };
 
   const generateStaticHTMLSnippet = () => {
     const isBn = language === 'bn';
-    const activeTitle = (isBn ? (seoForm.metaTitleBn || seoForm.metaTitle) : seoForm.metaTitle) || 'KitabGhar - Digital E-Book Store';
-    const activeDesc = (isBn ? (seoForm.metaDescriptionBn || seoForm.metaDescription) : seoForm.metaDescription) || '';
-    const ogTitle = (isBn ? (seoForm.ogTitleBn || seoForm.ogTitle) : seoForm.ogTitle) || activeTitle;
-    const ogDesc = (isBn ? (seoForm.ogDescriptionBn || seoForm.ogDescription) : seoForm.ogDescription) || activeDesc;
-    const rawImage = seoForm.ogImage || settings.logoUrl || '/assets/aistudio/1794301559714_e54adc4f.jpg';
-    const canonical = seoForm.canonicalUrl || 'https://yourdomain.com';
+    const activeTitle = escapeHtml((isBn ? (seoForm.metaTitleBn || seoForm.metaTitle) : seoForm.metaTitle) || 'KitabGhar - Digital E-Book Store');
+    const activeDesc = escapeHtml((isBn ? (seoForm.metaDescriptionBn || seoForm.metaDescription) : seoForm.metaDescription) || '');
+    const ogTitle = escapeHtml((isBn ? (seoForm.ogTitleBn || seoForm.ogTitle) : seoForm.ogTitle) || activeTitle);
+    const ogDesc = escapeHtml((isBn ? (seoForm.ogDescriptionBn || seoForm.ogDescription) : seoForm.ogDescription) || activeDesc);
+    const rawImage = escapeHtml(sanitizeUrl(seoForm.ogImage || settings.logoUrl, '/assets/aistudio/1794301559714_e54adc4f.jpg'));
+    const canonical = escapeHtml(sanitizeUrl(seoForm.canonicalUrl, 'https://yourdomain.com'));
+    const safeKeywords = escapeHtml(seoForm.keywords);
+    const safeAuthor = escapeHtml(seoForm.author);
+    const safeSiteName = escapeHtml(seoForm.siteName || settings.storeName);
+    const safeTwitter = escapeHtml(seoForm.twitterHandle);
 
     return `<!-- KitabGhar Production SEO & OpenGraph Meta Tags -->
 <title>${activeTitle}</title>
 <meta name="description" content="${activeDesc}" />
-<meta name="keywords" content="${seoForm.keywords}" />
-<meta name="author" content="${seoForm.author}" />
+<meta name="keywords" content="${safeKeywords}" />
+<meta name="author" content="${safeAuthor}" />
 <link rel="canonical" href="${canonical}" />
 
 <!-- OpenGraph / Facebook / WhatsApp -->
@@ -384,14 +417,14 @@ export const AdminModal: React.FC = () => {
 <meta property="og:description" content="${ogDesc}" />
 <meta property="og:image" content="${rawImage}" />
 <meta property="og:url" content="${canonical}" />
-<meta property="og:site_name" content="${seoForm.siteName || settings.storeName}" />
+<meta property="og:site_name" content="${safeSiteName}" />
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${ogTitle}" />
 <meta name="twitter:description" content="${ogDesc}" />
 <meta name="twitter:image" content="${rawImage}" />
-${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterHandle}" />` : ''}`;
+${safeTwitter ? `<meta name="twitter:site" content="${safeTwitter}" />` : ''}`;
   };
 
   return (
@@ -491,9 +524,10 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                     <input
                       type="text"
                       required
+                      autoComplete="off"
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
-                      placeholder="e.g. tahsinislam"
+                      placeholder={language === 'bn' ? 'মালিকের ইউজারনেম দিন' : 'Enter owner username'}
                       className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
                       autoFocus
                     />
@@ -510,6 +544,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       value={passcodeInput}
                       onChange={(e) => setPasscodeInput(e.target.value)}
                       placeholder="••••••••••••"
@@ -544,12 +579,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
             )}
 
             <div className="pt-2 text-[11px] text-slate-400 space-y-1">
-              <p>{language === 'bn' ? 'সর্বোচ্চ ৩টি প্রচেষ্টার সুযোগ দেওয়া হবে।' : 'Maximum 3 attempts before temporary lockout.'}</p>
-              <p className="text-slate-400/80">
-                {language === 'bn' 
-                  ? 'শর্টকাট: কিবোর্ডে Ctrl + Shift + A চেপে এই প্যানেল খুলতে পারবেন।' 
-                  : 'Quick toggle: Ctrl + Shift + A'}
-              </p>
+              <p>{language === 'bn' ? 'SHA-256 এনক্রিপ্টেড সুরক্ষা সক্রিয়। সর্বোচ্চ ৩টি প্রচেষ্টার সুযোগ দেওয়া হবে।' : 'SHA-256 Encrypted Protection Active. Max 3 attempts before lockout.'}</p>
             </div>
           </div>
         ) : (
@@ -911,19 +941,22 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
 
                               <div className="flex items-center gap-1 shrink-0">
                                 <button
+                                  type="button"
                                   onClick={() => handleStartEdit(book)}
-                                  className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                  className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                                   title="Edit"
                                 >
-                                  <Edit2 className="w-4 h-4" />
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                  <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => {
-                                    if (confirm(language === 'bn' ? `"${displayTitle}" বইটি কি মুছে ফেলতে চান?` : `Delete "${book.title}" from catalog?`)) {
-                                      deleteEbook(book.id);
-                                    }
+                                    deleteEbook(book.id);
+                                    setSaveSuccess(true);
+                                    setTimeout(() => setSaveSuccess(false), 2000);
                                   }}
-                                  className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                                  className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                                   title="Delete"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -936,18 +969,19 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
 
                       <div className="pt-2 flex items-center justify-between">
                         <button
+                          type="button"
                           onClick={() => {
-                            if (confirm(language === 'bn' ? 'ক্যাটালগ রিসেট করতে চান?' : 'Reset catalog back to initial default books?')) {
-                              resetCatalog();
-                            }
+                            resetCatalog();
+                            setSaveSuccess(true);
+                            setTimeout(() => setSaveSuccess(false), 2500);
                           }}
-                          className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1"
+                          className="text-xs text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 font-semibold cursor-pointer"
                         >
-                          <RotateCcw className="w-3 h-3" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                           <span>{language === 'bn' ? 'ডিফল্ট বইগুলোতে রিসেট করুন' : 'Reset to Default Books'}</span>
                         </button>
-                        <span className="text-xs text-slate-400">
-                          {language === 'bn' ? 'সিপ্যানেলে আপলোডের জন্য Export products.json চাপুন।' : 'Export products.json when ready for cPanel.'}
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          {language === 'bn' ? 'সকল পরিবর্তন রিয়েল-টাইমে অটো-সেভ হয় (রিফ্রেশ প্রয়োজন নেই)' : 'All changes auto-save in real time without refresh'}
                         </span>
                       </div>
                     </div>
@@ -971,7 +1005,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.storeName}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, storeName: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ storeName: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
@@ -981,7 +1015,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.storeNameBn}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, storeNameBn: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ storeNameBn: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
@@ -991,7 +1025,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.storeTagline}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, storeTagline: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ storeTagline: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
@@ -1001,7 +1035,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.storeTaglineBn}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, storeTaglineBn: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ storeTaglineBn: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
@@ -1011,7 +1045,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.logoUrl || ''}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, logoUrl: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ logoUrl: e.target.value })}
                           placeholder="/assets/aistudio/1794301559714_e54adc4f.jpg"
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
@@ -1024,7 +1058,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.whatsappNumber}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ whatsappNumber: e.target.value })}
                           placeholder="8801700968369"
                           className="w-full px-3 py-2 rounded-lg border border-emerald-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
                         />
@@ -1037,7 +1071,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.whatsappDisplayNumber}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, whatsappDisplayNumber: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ whatsappDisplayNumber: e.target.value })}
                           placeholder="+880 1700-968369"
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
@@ -1057,12 +1091,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.bkashNumber}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ bkashNumber: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-pink-200 dark:border-pink-800 bg-white dark:bg-slate-800 font-mono text-xs"
                         />
                         <select
                           value={settingsForm.bkashType}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, bkashType: e.target.value as 'Personal' | 'Merchant' })}
+                          onChange={(e) => handleLiveSettingChange({ bkashType: e.target.value as 'Personal' | 'Merchant' })}
                           className="w-full px-2 py-1.5 rounded-lg border border-pink-200 dark:border-pink-800 bg-white dark:bg-slate-800 text-xs"
                         >
                           <option value="Personal">Personal (Send Money)</option>
@@ -1076,12 +1110,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <input
                           type="text"
                           value={settingsForm.nagadNumber}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: e.target.value })}
+                          onChange={(e) => handleLiveSettingChange({ nagadNumber: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-orange-200 dark:border-orange-800 bg-white dark:bg-slate-800 font-mono text-xs"
                         />
                         <select
                           value={settingsForm.nagadType}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, nagadType: e.target.value as 'Personal' | 'Merchant' })}
+                          onChange={(e) => handleLiveSettingChange({ nagadType: e.target.value as 'Personal' | 'Merchant' })}
                           className="w-full px-2 py-1.5 rounded-lg border border-orange-200 dark:border-orange-800 bg-white dark:bg-slate-800 text-xs"
                         >
                           <option value="Personal">Personal (Send Money)</option>
@@ -1091,37 +1125,80 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                     </div>
                   </div>
 
-                  {/* Security Credentials Setting */}
+                  {/* Security Credentials Setting (Salted SHA-256 — Zero Plaintext Storage) */}
                   <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">
-                      {language === 'bn' ? 'এডমিন লগইন নিরাপত্তা ও পাসওয়ার্ড পরিবর্তন' : 'Admin Security Credentials'}
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="border-b border-slate-200 dark:border-slate-800 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? 'এডমিন লগইন নিরাপত্তা ও পাসওয়ার্ড পরিবর্তন (SHA-256 Encrypted)' : 'Admin Security Credentials (SHA-256 Encrypted)'}</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {language === 'bn'
+                          ? 'নিরাপত্তার স্বার্থে আপনার বর্তমান পাসওয়ার্ড কোথাও প্লেইন-টেক্সটে দেখানো বা সংরক্ষণ করা হয় না। নতুন পাসওয়ার্ড সেট করতে নিচের ঘর পূরণ করুন।'
+                          : 'For security, your current password is encrypted and never displayed in plaintext. Enter a new username or password below to update.'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs items-end">
                       <div>
-                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">Admin Username</label>
+                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">
+                          {language === 'bn' ? 'নতুন ইউজারনেম (ঐচ্ছিক)' : 'New Admin Username (Optional)'}
+                        </label>
                         <input
                           type="text"
-                          value={settingsForm.adminUsername || 'tahsinislam'}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, adminUsername: e.target.value })}
+                          autoComplete="off"
+                          value={newAdminUser}
+                          onChange={(e) => setNewAdminUser(e.target.value)}
+                          placeholder={language === 'bn' ? 'অপরিবর্তিত রাখতে ফাঁকা রাখুন' : 'Leave blank to keep current'}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                         />
                       </div>
                       <div>
-                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">Admin Password</label>
+                        <label className="text-slate-600 dark:text-slate-400 block mb-1 font-semibold">
+                          {language === 'bn' ? 'নতুন পাসওয়ার্ড (ঐচ্ছিক)' : 'New Admin Password (Optional)'}
+                        </label>
                         <input
                           type="password"
-                          value={settingsForm.adminPasscode || 'tahsinislam4567'}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, adminPasscode: e.target.value })}
+                          autoComplete="new-password"
+                          value={newAdminPass}
+                          onChange={(e) => setNewAdminPass(e.target.value)}
+                          placeholder={language === 'bn' ? 'নতুন পাসওয়ার্ড দিন' : 'Enter new password'}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                         />
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newAdminUser.trim() && !newAdminPass.trim()) return;
+                            const patch: Partial<typeof settingsForm> = {};
+                            if (newAdminUser.trim()) {
+                              patch.adminUsernameHash = computeSaltedHash(newAdminUser.trim().toLowerCase());
+                            }
+                            if (newAdminPass.trim()) {
+                              patch.adminPasscodeHash = computeSaltedHash(newAdminPass.trim());
+                              createAdminSession(patch.adminPasscodeHash);
+                            }
+                            handleLiveSettingChange(patch);
+                            setNewAdminUser('');
+                            setNewAdminPass('');
+                            setSaveSuccess(true);
+                            setTimeout(() => setSaveSuccess(false), 2500);
+                          }}
+                          className="w-full px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                        >
+                          {language === 'bn' ? 'পাসওয়ার্ড আপডেট করুন' : 'Update Encrypted Credentials'}
+                        </button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {language === 'bn' ? '✓ টাইপ করার সাথে সাথেই ওয়েবসাইটে লাইভ আপডেট হচ্ছে' : '✓ Auto-saving live as you type'}
+                    </span>
                     <button
                       type="submit"
-                      className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-xs"
+                      className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-xs cursor-pointer"
                     >
                       <Save className="w-4 h-4" />
                       <span>{language === 'bn' ? 'সেটিংস সেভ করুন' : 'Save Settings'}</span>
@@ -1159,6 +1236,71 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         <Download className="w-4 h-4 text-emerald-600" />
                         <span>{language === 'bn' ? 'kitabghar-cpanel-ready.zip ডাউনলোড করুন' : 'Download cPanel Ready ZIP'}</span>
                       </a>
+                    </div>
+                  </div>
+
+                  {/* Full Store Backup & Restore (Books + Settings + Reviews + Coupons) */}
+                  <div className="p-4 sm:p-5 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Save className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? 'সম্পূর্ণ ওয়েবসাইট ডাটা ব্যাকআপ ও রিস্টোর (১-ক্লিক)' : 'Full Website Data Backup & Restore'}</span>
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {language === 'bn'
+                        ? 'আপনার সকল বই, সেটিংস, বান্ডেল, কুপন ও রিভিউ একটি ফাইলে ব্যাকআপ রাখুন অথবা আগের ব্যাকআপ ফাইল আপলোড করে রিস্টোর করুন—যাতে কখনোই কোনো তথ্য বারবার লিখতে না হয়।'
+                        : 'Export or restore all your books, settings, bundles, coupons, and reviews in one JSON file so you never have to re-enter data.'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={exportFullStoreBackupJSON}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors text-xs shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>{language === 'bn' ? 'সম্পূর্ণ ব্যাকআপ ডাউনলোড (.json)' : 'Download Full Backup (.json)'}</span>
+                      </button>
+
+                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:border-emerald-500 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition-colors text-xs shadow-xs cursor-pointer">
+                        <FileCode className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? 'ব্যাকআপ ফাইল রিস্টোর করুন' : 'Restore Backup JSON'}</span>
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (typeof reader.result === 'string') {
+                                const ok = importFullStoreBackupJSON(reader.result);
+                                if (ok) {
+                                  setSaveSuccess(true);
+                                  setTimeout(() => setSaveSuccess(false), 3000);
+                                }
+                              }
+                            };
+                            reader.readAsText(file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetAllSettings();
+                          resetCatalog();
+                          setSaveSuccess(true);
+                          setTimeout(() => setSaveSuccess(false), 2500);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{language === 'bn' ? 'সব সেটিংস ডিফল্টে রিসেট করুন' : 'Factory Reset All'}</span>
+                      </button>
                     </div>
                   </div>
 
@@ -1429,7 +1571,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             type="text"
                             required
                             value={seoForm.metaTitle}
-                            onChange={(e) => setSeoForm({ ...seoForm, metaTitle: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ metaTitle: e.target.value })}
                             placeholder="e.g. KitabGhar - Digital E-Book Store | Free & Paid Books"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1447,7 +1589,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.metaTitleBn}
-                            onChange={(e) => setSeoForm({ ...seoForm, metaTitleBn: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ metaTitleBn: e.target.value })}
                             placeholder="যেমন: কিতাবঘর - ডিজিটাল ই-বুক স্টোর ও হোয়াটসঅ্যাপ অর্ডার"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1480,7 +1622,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             rows={3}
                             required
                             value={seoForm.metaDescription}
-                            onChange={(e) => setSeoForm({ ...seoForm, metaDescription: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ metaDescription: e.target.value })}
                             placeholder="Download free curated e-books or buy premium tech guides with instant WhatsApp checkout and bKash/Nagad verification in Bangladesh."
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white leading-relaxed"
                           />
@@ -1498,7 +1640,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <textarea
                             rows={3}
                             value={seoForm.metaDescriptionBn}
-                            onChange={(e) => setSeoForm({ ...seoForm, metaDescriptionBn: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ metaDescriptionBn: e.target.value })}
                             placeholder="ফ্রি ও পেইড বাংলা-ইংরেজি ই-বুক ডাউনলোড করুন। বিকাশ ও নগদ পেমেন্ট ভেরিফিকেশন সহ হোয়াটসঅ্যাপে সরাসরি অর্ডার করুন।"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white leading-relaxed"
                           />
@@ -1525,7 +1667,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.ogTitle}
-                            onChange={(e) => setSeoForm({ ...seoForm, ogTitle: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ ogTitle: e.target.value })}
                             placeholder="KitabGhar - Your Ultimate Book Home"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1538,7 +1680,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.ogTitleBn || ''}
-                            onChange={(e) => setSeoForm({ ...seoForm, ogTitleBn: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ ogTitleBn: e.target.value })}
                             placeholder="কিতাবঘর - আপনার বইয়ের নির্ভরযোগ্য ঠিকানা"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1551,7 +1693,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.ogDescription}
-                            onChange={(e) => setSeoForm({ ...seoForm, ogDescription: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ ogDescription: e.target.value })}
                             placeholder="Discover high-impact programming, freelancing, and business e-books. Instant free downloads and 1-click WhatsApp checkout."
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1572,7 +1714,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             <input
                               type="text"
                               value={seoForm.ogImage}
-                              onChange={(e) => setSeoForm({ ...seoForm, ogImage: e.target.value })}
+                              onChange={(e) => handleLiveSeoChange({ ogImage: e.target.value })}
                               placeholder="/assets/aistudio/1794301559714_e54adc4f.jpg or https://..."
                               className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                             />
@@ -1602,7 +1744,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.keywords}
-                            onChange={(e) => setSeoForm({ ...seoForm, keywords: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ keywords: e.target.value })}
                             placeholder="kitabghar, bangla ebook, pdf download, bkash payment, nagad payment, programming books, freelancing bangla"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1615,7 +1757,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.canonicalUrl || ''}
-                            onChange={(e) => setSeoForm({ ...seoForm, canonicalUrl: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ canonicalUrl: e.target.value })}
                             placeholder="https://yourdomain.com"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1628,7 +1770,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.twitterHandle || ''}
-                            onChange={(e) => setSeoForm({ ...seoForm, twitterHandle: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ twitterHandle: e.target.value })}
                             placeholder="@kitabghar"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1641,7 +1783,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.author}
-                            onChange={(e) => setSeoForm({ ...seoForm, author: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ author: e.target.value })}
                             placeholder="Tahsin Islam"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1654,7 +1796,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <input
                             type="text"
                             value={seoForm.siteName || ''}
-                            onChange={(e) => setSeoForm({ ...seoForm, siteName: e.target.value })}
+                            onChange={(e) => handleLiveSeoChange({ siteName: e.target.value })}
                             placeholder="KitabGhar"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
@@ -1860,19 +2002,29 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 type="button"
+                                onClick={() => {
+                                  setNewCouponCode(c.code);
+                                  setNewDiscountType(c.discountType);
+                                  setNewDiscountValue(c.discountValue);
+                                  setNewMinSpend(c.minSpend || 0);
+                                  setNewCouponDesc(c.descriptionBn || c.description || '');
+                                }}
+                                className="px-2 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                title="Edit Coupon"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => toggleCoupon(c.code)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               >
                                 {c.isActive ? (language === 'bn' ? 'অফ করুন' : 'Disable') : (language === 'bn' ? 'অন করুন' : 'Enable')}
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  if (confirm(language === 'bn' ? `আপনি কি '${c.code}' কুপনটি ডিলিট করতে চান?` : `Delete coupon '${c.code}'?`)) {
-                                    deleteCoupon(c.code);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                                onClick={() => deleteCoupon(c.code)}
+                                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
                                 title="Delete Coupon"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1886,7 +2038,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                 </div>
               )}
 
-              {/* TAB 6: SITE SECTIONS, FLASH SALE & AUTHOR STORY CONTROL */}
+              {/* TAB 6: SITE SECTIONS, HERO, FLASH SALE & AUTHOR STORY CONTROL */}
               {activeTab === 'sections' && (
                 <form
                   onSubmit={(e) => {
@@ -1907,8 +2059,8 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         </h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                           {language === 'bn'
-                            ? 'যেকোনো সেকশন ১-ক্লিকে চালু বা বন্ধ করুন এবং নিচে "সেভ করুন" চাপুন।'
-                            : 'Toggle any homepage section or popup on or off with 1 click.'}
+                            ? 'যেকোনো সেকশন ১-ক্লিকে চালু বা বন্ধ করলে সাথে সাথেই ওয়েবসাইটে লাইভ পরিবর্তন হবে (ব্রাউজার রিফ্রেশ প্রয়োজন নেই)।'
+                            : 'Toggle any homepage section or popup on or off with 1 click — updates live immediately.'}
                         </p>
                       </div>
                     </div>
@@ -1926,8 +2078,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.flashSale?.enabled !== false}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 enabled: e.target.checked
@@ -1950,7 +2101,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.showBundlesSection !== false}
                           onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, showBundlesSection: e.target.checked })
+                            handleLiveSettingChange({ showBundlesSection: e.target.checked })
                           }
                           className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                         />
@@ -1968,7 +2119,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.showReviewsSection !== false}
                           onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, showReviewsSection: e.target.checked })
+                            handleLiveSettingChange({ showReviewsSection: e.target.checked })
                           }
                           className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                         />
@@ -1986,8 +2137,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.authorStory?.enabled !== false}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 enabled: e.target.checked
@@ -2010,7 +2160,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.showFaqSection !== false}
                           onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, showFaqSection: e.target.checked })
+                            handleLiveSettingChange({ showFaqSection: e.target.checked })
                           }
                           className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                         />
@@ -2028,11 +2178,91 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="checkbox"
                           checked={settingsForm.showLiveSalesPopup !== false}
                           onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, showLiveSalesPopup: e.target.checked })
+                            handleLiveSettingChange({ showLiveSalesPopup: e.target.checked })
                           }
                           className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                         />
                       </label>
+
+                      {/* Toggle 7: How It Works Section */}
+                      <label className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-500/50 transition-colors">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {language === 'bn' ? 'অর্ডার ও ডেলিভারি গাইড সেকশন' : 'How It Works Guide Section'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">3-step payment & delivery guide</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.showHowItWorksSection !== false}
+                          onChange={(e) =>
+                            handleLiveSettingChange({ showHowItWorksSection: e.target.checked })
+                          }
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 1B. Homepage Hero Headline & Subtitle Editor */}
+                  <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        <span>{language === 'bn' ? 'হোমপেজ মেইন হিরো হেডলাইন ও সাবটাইটেল এডিটর' : 'Homepage Hero Headline & Subtitle Editor'}</span>
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'হিরো মেইন হেডলাইন (বাংলা)' : 'Hero Headline (Bangla)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.heroTitleBn || ''}
+                          onChange={(e) => handleLiveSettingChange({ heroTitleBn: e.target.value })}
+                          placeholder="আপনার পরবর্তী প্রিয় ডিজিটাল বইটি খুঁজে নিন।"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'হিরো মেইন হেডলাইন (English)' : 'Hero Headline (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.heroTitle || ''}
+                          onChange={(e) => handleLiveSettingChange({ heroTitle: e.target.value })}
+                          placeholder="Discover your next digital read."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'হিরো সাবটাইটেল বিবরণ (বাংলা)' : 'Hero Subtitle (Bangla)'}
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={settingsForm.heroSubtitleBn || ''}
+                          onChange={(e) => handleLiveSettingChange({ heroSubtitleBn: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          {language === 'bn' ? 'হিরো সাবটাইটেল বিবরণ (English)' : 'Hero Subtitle (English)'}
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={settingsForm.heroSubtitle || ''}
+                          onChange={(e) => handleLiveSettingChange({ heroSubtitle: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -2054,8 +2284,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.flashSale?.badgeBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 badgeBn: e.target.value
@@ -2074,8 +2303,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.flashSale?.badgeEn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 badgeEn: e.target.value
@@ -2094,8 +2322,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.flashSale?.textBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 textBn: e.target.value
@@ -2114,8 +2341,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.flashSale?.textEn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 textEn: e.target.value
@@ -2134,8 +2360,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.flashSale?.promoCode || 'KITAB20'}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               flashSale: {
                                 ...(settingsForm.flashSale || DEFAULT_STORE_SETTINGS.flashSale!),
                                 promoCode: e.target.value.toUpperCase()
@@ -2154,8 +2379,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.downloadGiftCouponCode || 'FIRST20'}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               downloadGiftCouponCode: e.target.value.toUpperCase()
                             })
                           }
@@ -2183,8 +2407,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.authorStory?.founderNameBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 founderNameBn: e.target.value
@@ -2203,8 +2426,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.authorStory?.founderName || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 founderName: e.target.value
@@ -2223,8 +2445,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.authorStory?.founderRoleBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 founderRoleBn: e.target.value
@@ -2243,8 +2464,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.authorStory?.founderRole || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 founderRole: e.target.value
@@ -2263,8 +2483,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="text"
                           value={settingsForm.authorStory?.headlineBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 headlineBn: e.target.value,
@@ -2284,8 +2503,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           rows={3}
                           value={settingsForm.authorStory?.bioBn || ''}
                           onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
+                            handleLiveSettingChange({
                               authorStory: {
                                 ...(settingsForm.authorStory || DEFAULT_STORE_SETTINGS.authorStory!),
                                 bioBn: e.target.value
@@ -2299,7 +2517,10 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                   </div>
 
                   {/* Save Button */}
-                  <div className="flex items-center justify-end gap-3 pt-2">
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {language === 'bn' ? '✓ সকল সুইচ ও টেক্সট রিয়েল-টাইমে অটো-সেভ হচ্ছে' : '✓ Auto-saving all switches & text in real time'}
+                    </span>
                     <button
                       type="submit"
                       className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer"
@@ -2324,12 +2545,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           <span>{language === 'bn' ? '১. কম্বো বান্ডেল অফার ম্যানেজার' : '1. Combo Bundles Manager'}</span>
                         </h4>
                         <p className="text-[11px] text-slate-500">
-                          {language === 'bn' ? 'একাধিক বই একত্রে বিশেষ ছাড়ে বিক্রি করার জন্য কম্বো বান্ডেল তৈরি বা ডিলিট করুন।' : 'Create or remove multi-book discount bundles.'}
+                          {language === 'bn' ? 'একাধিক বই একত্রে বিশেষ ছাড়ে বিক্রি করার জন্য কম্বো বান্ডেল তৈরি, এডিট বা ডিলিট করুন।' : 'Create, edit, or remove multi-book discount bundles.'}
                         </p>
                       </div>
                     </div>
 
-                    {/* Add New Bundle Form */}
+                    {/* Add / Edit Bundle Form */}
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -2337,8 +2558,8 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         const currentBundles = settings.bundles || DEFAULT_STORE_SETTINGS.bundles || [];
                         const orig = Number(bundleOrigPrice) || 700;
                         const price = Number(bundlePrice) || 450;
-                        const newBundle: ComboBundle = {
-                          id: `bundle-${Date.now()}`,
+                        const bundlePayload: ComboBundle = {
+                          id: editingBundleId || `bundle-${Date.now()}`,
                           name: bundleNameEn.trim() || bundleNameBn.trim(),
                           nameBn: bundleNameBn.trim(),
                           tagline: bundleTaglineBn.trim() || 'Complete mastery bundle',
@@ -2350,7 +2571,14 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           badge: bundleBadgeBn.trim() || 'Combo Deal',
                           badgeBn: bundleBadgeBn.trim() || 'স্পেশাল কম্বো'
                         };
-                        updateSettings({ bundles: [newBundle, ...currentBundles] });
+                        if (editingBundleId) {
+                          updateSettings({
+                            bundles: currentBundles.map(item => item.id === editingBundleId ? bundlePayload : item)
+                          });
+                        } else {
+                          updateSettings({ bundles: [bundlePayload, ...currentBundles] });
+                        }
+                        setEditingBundleId(null);
                         setBundleNameBn('');
                         setBundleNameEn('');
                         setBundleTaglineBn('');
@@ -2360,9 +2588,28 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       }}
                       className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
                     >
-                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
-                        {language === 'bn' ? 'নতুন কম্বো বান্ডেল যোগ করুন' : 'Create New Combo Bundle'}
-                      </h5>
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                          {editingBundleId
+                            ? (language === 'bn' ? 'বান্ডেল সম্পাদনা করুন' : 'Editing Combo Bundle')
+                            : (language === 'bn' ? 'নতুন কম্বো বান্ডেল যোগ করুন' : 'Create New Combo Bundle')}
+                        </h5>
+                        {editingBundleId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingBundleId(null);
+                              setBundleNameBn('');
+                              setBundleNameEn('');
+                              setBundleTaglineBn('');
+                              setSelectedBundleBooks([]);
+                            }}
+                            className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                          >
+                            {language === 'bn' ? 'বাতিল' : 'Cancel Edit'}
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <input
                           type="text"
@@ -2455,8 +2702,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="submit"
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{language === 'bn' ? 'বান্ডেল যোগ করুন' : 'Add Combo Bundle'}</span>
+                          {editingBundleId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                          <span>
+                            {editingBundleId
+                              ? (language === 'bn' ? 'বান্ডেল আপডেট করুন' : 'Update Bundle')
+                              : (language === 'bn' ? 'বান্ডেল যোগ করুন' : 'Add Combo Bundle')}
+                          </span>
                         </button>
                       </div>
                     </form>
@@ -2475,17 +2726,36 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                               ৳{b.bundlePrice} <span className="line-through text-slate-400 font-normal">৳{b.originalPrice}</span>
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = settings.bundles || DEFAULT_STORE_SETTINGS.bundles || [];
-                              updateSettings({ bundles: current.filter(item => item.id !== b.id) });
-                            }}
-                            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
-                            title="Delete Bundle"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingBundleId(b.id);
+                                setBundleNameBn(b.nameBn || b.name);
+                                setBundleNameEn(b.name);
+                                setBundleTaglineBn(b.taglineBn || b.tagline);
+                                setBundleBadgeBn(b.badgeBn || b.badge || '');
+                                setBundleOrigPrice(b.originalPrice);
+                                setBundlePrice(b.bundlePrice);
+                                setSelectedBundleBooks(b.bookIds || []);
+                              }}
+                              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                              title="Edit Bundle"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = settings.bundles || DEFAULT_STORE_SETTINGS.bundles || [];
+                                updateSettings({ bundles: current.filter(item => item.id !== b.id) });
+                              }}
+                              className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer"
+                              title="Delete Bundle"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2500,20 +2770,27 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       </h4>
                     </div>
 
-                    {/* Add FAQ Form */}
+                    {/* Add / Edit FAQ Form */}
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
                         if (!faqQBn.trim() || !faqABn.trim()) return;
                         const currentFaqs = settings.faqs || DEFAULT_STORE_SETTINGS.faqs || [];
-                        const newFaq: FAQEntry = {
-                          id: `faq-${Date.now()}`,
+                        const faqPayload: FAQEntry = {
+                          id: editingFaqId || `faq-${Date.now()}`,
                           questionBn: faqQBn.trim(),
                           question: faqQEn.trim() || faqQBn.trim(),
                           answerBn: faqABn.trim(),
                           answer: faqAEn.trim() || faqABn.trim()
                         };
-                        updateSettings({ faqs: [...currentFaqs, newFaq] });
+                        if (editingFaqId) {
+                          updateSettings({
+                            faqs: currentFaqs.map(item => item.id === editingFaqId ? faqPayload : item)
+                          });
+                        } else {
+                          updateSettings({ faqs: [...currentFaqs, faqPayload] });
+                        }
+                        setEditingFaqId(null);
                         setFaqQBn('');
                         setFaqQEn('');
                         setFaqABn('');
@@ -2523,9 +2800,28 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       }}
                       className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
                     >
-                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
-                        {language === 'bn' ? 'নতুন প্রশ্নোত্তর যোগ করুন' : 'Add New FAQ Item'}
-                      </h5>
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                          {editingFaqId
+                            ? (language === 'bn' ? 'প্রশ্নোত্তর সম্পাদনা করুন' : 'Editing FAQ Item')
+                            : (language === 'bn' ? 'নতুন প্রশ্নোত্তর যোগ করুন' : 'Add New FAQ Item')}
+                        </h5>
+                        {editingFaqId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingFaqId(null);
+                              setFaqQBn('');
+                              setFaqQEn('');
+                              setFaqABn('');
+                              setFaqAEn('');
+                            }}
+                            className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                          >
+                            {language === 'bn' ? 'বাতিল' : 'Cancel Edit'}
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
@@ -2556,8 +2852,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="submit"
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{language === 'bn' ? 'প্রশ্নোত্তর যোগ করুন' : 'Add FAQ'}</span>
+                          {editingFaqId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                          <span>
+                            {editingFaqId
+                              ? (language === 'bn' ? 'প্রশ্নোত্তর আপডেট করুন' : 'Update FAQ')
+                              : (language === 'bn' ? 'প্রশ্নোত্তর যোগ করুন' : 'Add FAQ')}
+                          </span>
                         </button>
                       </div>
                     </form>
@@ -2573,17 +2873,33 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             <h6 className="font-bold text-slate-900 dark:text-white">{f.questionBn || f.question}</h6>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{f.answerBn || f.answer}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = settings.faqs || DEFAULT_STORE_SETTINGS.faqs || [];
-                              updateSettings({ faqs: current.filter(item => item.id !== f.id) });
-                            }}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
-                            title="Delete FAQ"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingFaqId(f.id);
+                                setFaqQBn(f.questionBn || f.question);
+                                setFaqQEn(f.question);
+                                setFaqABn(f.answerBn || f.answer);
+                                setFaqAEn(f.answer);
+                              }}
+                              className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                              title="Edit FAQ"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = settings.faqs || DEFAULT_STORE_SETTINGS.faqs || [];
+                                updateSettings({ faqs: current.filter(item => item.id !== f.id) });
+                              }}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer"
+                              title="Delete FAQ"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2598,26 +2914,41 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       </h4>
                     </div>
 
-                    {/* Add Verified Review Form */}
+                    {/* Add / Edit Verified Review Form */}
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
                         if (!revNameBn.trim() || !revCommentBn.trim()) return;
-                        addReview({
-                          id: `rev-${Date.now()}`,
-                          name: revNameBn.trim(),
-                          nameBn: revNameBn.trim(),
-                          role: revRoleBn.trim() || 'Verified Reader',
-                          roleBn: revRoleBn.trim() || 'যাচাইকৃত পাঠক',
-                          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-                          rating: revRating,
-                          comment: revCommentBn.trim(),
-                          commentBn: revCommentBn.trim(),
-                          bookTitle: revBookBn,
-                          bookTitleBn: revBookBn,
-                          verified: true,
-                          date: 'যাচাইকৃত'
-                        });
+                        if (editingReviewId) {
+                          updateReview(editingReviewId, {
+                            name: revNameBn.trim(),
+                            nameBn: revNameBn.trim(),
+                            role: revRoleBn.trim() || 'Verified Reader',
+                            roleBn: revRoleBn.trim() || 'যাচাইকৃত পাঠক',
+                            rating: revRating,
+                            comment: revCommentBn.trim(),
+                            commentBn: revCommentBn.trim(),
+                            bookTitle: revBookBn,
+                            bookTitleBn: revBookBn
+                          });
+                        } else {
+                          addReview({
+                            id: `rev-${Date.now()}`,
+                            name: revNameBn.trim(),
+                            nameBn: revNameBn.trim(),
+                            role: revRoleBn.trim() || 'Verified Reader',
+                            roleBn: revRoleBn.trim() || 'যাচাইকৃত পাঠক',
+                            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                            rating: revRating,
+                            comment: revCommentBn.trim(),
+                            commentBn: revCommentBn.trim(),
+                            bookTitle: revBookBn,
+                            bookTitleBn: revBookBn,
+                            verified: true,
+                            date: 'যাচাইকৃত'
+                          });
+                        }
+                        setEditingReviewId(null);
                         setRevNameBn('');
                         setRevCommentBn('');
                         setSaveSuccess(true);
@@ -2625,9 +2956,26 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                       }}
                       className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-3"
                     >
-                      <h5 className="font-bold text-slate-800 dark:text-slate-200">
-                        {language === 'bn' ? 'নতুন ভেরিফাইড রিভিউ যোগ করুন' : 'Add Verified Customer Review'}
-                      </h5>
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-bold text-slate-800 dark:text-slate-200">
+                          {editingReviewId
+                            ? (language === 'bn' ? 'রিভিউ সম্পাদনা করুন' : 'Editing Customer Review')
+                            : (language === 'bn' ? 'নতুন ভেরিফাইড রিভিউ যোগ করুন' : 'Add Verified Customer Review')}
+                        </h5>
+                        {editingReviewId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingReviewId(null);
+                              setRevNameBn('');
+                              setRevCommentBn('');
+                            }}
+                            className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                          >
+                            {language === 'bn' ? 'বাতিল' : 'Cancel Edit'}
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <input
                           type="text"
@@ -2668,7 +3016,7 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                               type="button"
                               key={st}
                               onClick={() => setRevRating(st)}
-                              className="p-0.5"
+                              className="p-0.5 cursor-pointer"
                             >
                               <Star className={`w-4 h-4 ${st <= revRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
                             </button>
@@ -2678,8 +3026,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="submit"
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{language === 'bn' ? 'রিভিউ যোগ করুন' : 'Publish Review'}</span>
+                          {editingReviewId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                          <span>
+                            {editingReviewId
+                              ? (language === 'bn' ? 'রিভিউ আপডেট করুন' : 'Update Review')
+                              : (language === 'bn' ? 'রিভিউ যোগ করুন' : 'Publish Review')}
+                          </span>
                         </button>
                       </div>
                     </form>
@@ -2698,14 +3050,31 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                             </div>
                             <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">&quot;{r.commentBn || r.comment}&quot;</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteReview(r.id)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
-                            title="Delete Review"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingReviewId(r.id);
+                                setRevNameBn(r.nameBn || r.name);
+                                setRevRoleBn(r.roleBn || r.role);
+                                setRevBookBn(r.bookTitleBn || r.bookTitle);
+                                setRevCommentBn(r.commentBn || r.comment);
+                                setRevRating(r.rating);
+                              }}
+                              className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                              title="Edit Review"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteReview(r.id)}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer"
+                              title="Delete Review"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2713,16 +3082,28 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
 
                   {/* 4. LIVE SALES POPUP NOTIFICATIONS MANAGER */}
                   <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
-                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                        <span>{language === 'bn' ? '৪. লাইভ সেলস সোশ্যাল প্রুফ পপআপ ম্যানেজার' : '4. Live Sales Notification Popup Items'}</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        {language === 'bn'
-                          ? 'স্ক্রিনের নিচে কোণায় "হাসিব এইমাত্র বইটি কিনলেন" নোটিফিকেশনে কাদের নাম ও জেলা দেখাবে তা নিয়ন্ত্রণ করুন।'
-                          : 'Customize the buyer notifications that cycle in the bottom-left corner.'}
-                      </p>
+                    <div className="border-b border-slate-200 dark:border-slate-700 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                          <span>{language === 'bn' ? '৪. লাইভ সেলস সোশ্যাল প্রুফ পপআপ ম্যানেজার' : '4. Live Sales Notification Popup Items'}</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {language === 'bn'
+                            ? 'স্ক্রিনের নিচে কোণায় "হাসিব এইমাত্র বইটি কিনলেন" নোটিফিকেশনে কাদের নাম ও জেলা দেখাবে তা নিয়ন্ত্রণ করুন।'
+                            : 'Customize the buyer notifications that cycle in the bottom-left corner.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('kitabghar:trigger-live-sale-toast'));
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold text-xs hover:bg-emerald-200 transition-colors shrink-0 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>{language === 'bn' ? 'পপআপ টেস্ট করুন' : 'Preview Popup Now'}</span>
+                      </button>
                     </div>
 
                     <form
@@ -2730,8 +3111,8 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                         e.preventDefault();
                         if (!saleBuyerBn.trim() || !saleBookBn.trim()) return;
                         const currentSales = settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || [];
-                        const newSale: LiveSaleItem = {
-                          id: `sale-${Date.now()}`,
+                        const salePayload: LiveSaleItem = {
+                          id: editingSaleId || `sale-${Date.now()}`,
                           buyerName: saleBuyerBn.trim(),
                           buyerNameBn: saleBuyerBn.trim(),
                           district: saleDistrictBn.trim() || 'Dhaka',
@@ -2741,7 +3122,14 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           timeAgo: saleTimeBn.trim() || '5 mins ago',
                           timeAgoBn: saleTimeBn.trim() || '৫ মিনিট আগে'
                         };
-                        updateSettings({ liveSales: [newSale, ...currentSales] });
+                        if (editingSaleId) {
+                          updateSettings({
+                            liveSales: currentSales.map(s => s.id === editingSaleId ? salePayload : s)
+                          });
+                        } else {
+                          updateSettings({ liveSales: [salePayload, ...currentSales] });
+                        }
+                        setEditingSaleId(null);
                         setSaleBuyerBn('');
                         setSaleDistrictBn('');
                         setSaleBookBn('');
@@ -2778,8 +3166,12 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                           type="submit"
                           className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{language === 'bn' ? 'পপআপ যোগ করুন' : 'Add Notification'}</span>
+                          {editingSaleId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                          <span>
+                            {editingSaleId
+                              ? (language === 'bn' ? 'পপআপ আপডেট' : 'Update Toast')
+                              : (language === 'bn' ? 'পপআপ যোগ করুন' : 'Add Notification')}
+                          </span>
                         </button>
                       </div>
                     </form>
@@ -2799,17 +3191,33 @@ ${seoForm.twitterHandle ? `<meta name="twitter:site" content="${seoForm.twitterH
                               {item.bookTitleBn || item.bookTitle}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || [];
-                              updateSettings({ liveSales: current.filter(s => s.id !== item.id) });
-                            }}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg shrink-0"
-                            title="Remove Notification"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSaleId(item.id);
+                                setSaleBuyerBn(item.buyerNameBn || item.buyerName);
+                                setSaleDistrictBn(item.districtBn || item.district);
+                                setSaleBookBn(item.bookTitleBn || item.bookTitle);
+                                setSaleTimeBn(item.timeAgoBn || item.timeAgo);
+                              }}
+                              className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                              title="Edit Notification"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = settings.liveSales || DEFAULT_STORE_SETTINGS.liveSales || [];
+                                updateSettings({ liveSales: current.filter(s => s.id !== item.id) });
+                              }}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer"
+                              title="Remove Notification"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

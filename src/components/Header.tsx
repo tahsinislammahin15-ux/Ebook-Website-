@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Sun, Moon, Shield, BookOpen, Languages, Bookmark } from 'lucide-react';
+import { Sun, Moon, Shield, Languages, Bookmark } from 'lucide-react';
+import { hasValidAdminSession } from '../utils/security';
 
 interface HeaderProps {
   onSelectCategory: (category: string) => void;
@@ -12,6 +13,23 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
     settings, darkMode, toggleDarkMode, openAdmin, 
     language, toggleLanguage, t, wishlist, openWishlist 
   } = useStore();
+
+  const [isOwnerLoggedIn, setIsOwnerLoggedIn] = useState<boolean>(() =>
+    hasValidAdminSession(settings.adminPasscodeHash)
+  );
+
+  useEffect(() => {
+    const syncAuth = () => {
+      setIsOwnerLoggedIn(hasValidAdminSession(settings.adminPasscodeHash));
+    };
+    syncAuth();
+    window.addEventListener('kitabghar:admin-auth-changed', syncAuth);
+    window.addEventListener('storage', syncAuth);
+    return () => {
+      window.removeEventListener('kitabghar:admin-auth-changed', syncAuth);
+      window.removeEventListener('storage', syncAuth);
+    };
+  }, [settings.adminPasscodeHash]);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
@@ -25,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
               e.preventDefault();
               onSelectCategory('all');
             }}
+            onDoubleClick={openAdmin}
             className="flex items-center gap-2.5 text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity group"
           >
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-white shadow-xs border border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-center p-0.5 group-hover:scale-105 transition-transform">
@@ -36,8 +55,8 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
             </div>
             <div className="flex flex-col text-left">
               <span className="leading-tight font-extrabold">{language === 'bn' ? settings.storeNameBn : settings.storeName}</span>
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 hidden sm:block leading-none mt-0.5">
-                {language === 'bn' ? 'Your Ultimate Book Home' : 'Your Ultimate Book Home'}
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 hidden sm:block leading-none mt-0.5 max-w-[200px] truncate">
+                {language === 'bn' ? (settings.storeTaglineBn || settings.storeTagline) : settings.storeTagline}
               </span>
             </div>
           </a>
@@ -101,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
           </a>
         </nav>
 
-        {/* Zone 3: Wishlist + Language toggle + Dark Mode */}
+        {/* Zone 3: Wishlist + Language toggle + Dark Mode + Owner Admin Quick Button */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           
           {/* Wishlist Button with Counter */}
@@ -137,6 +156,19 @@ export const Header: React.FC<HeaderProps> = ({ onSelectCategory, activeFilter }
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
+
+          {/* Direct 1-Click Admin Panel Button (Visible only to authenticated owner; hidden from public visitors) */}
+          {isOwnerLoggedIn && (
+            <button
+              onClick={openAdmin}
+              aria-label="Admin Control Panel"
+              title={language === 'bn' ? 'এডমিন কন্ট্রোল প্যানেল খুলুন' : 'Open Admin Control Panel'}
+              className="min-h-[40px] px-2.5 flex items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all text-xs font-bold active:scale-95 cursor-pointer"
+            >
+              <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">{language === 'bn' ? 'এডমিন' : 'Admin'}</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
